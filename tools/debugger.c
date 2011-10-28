@@ -216,11 +216,12 @@ void do_download(int argc, param *argv) {
 	w = (void*) data;
 	addr = argv[1].n;
 	while (r > 0) {
-		u32 tmp = 0xeeeeeeee;
 		if (swdp_ahb_write(addr, *w)) {
 			printf("error: failed to write @ %08x\n", addr);
 			return;
 		}
+#if 0
+		u32 tmp = 0xeeeeeeee;
 		if (swdp_ahb_read(addr, &tmp)) {
 			printf("oops\n");
 			return;
@@ -229,6 +230,7 @@ void do_download(int argc, param *argv) {
 			printf("ACK %08x %08x @ %08x\n", tmp, *w, addr);
 			return;
 		}
+#endif
 		r++;
 		w++;
 		addr += 4;
