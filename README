@@ -1,0 +1,66 @@
+
+===========================================================================
+          m3dev - tools for embedded ARM Cortex M3 development
+===========================================================================
+
+This project is a collection of (linux-centric) tools for working on
+small embedded systems based on the ARM Cortex M3 CPU.
+
+Original work was done with a STM32F103 part, but it will not stop there.
+
+Everything is either Apache 2 or BSD licensed, to allow for easy,
+no-strings-attached, inclusion in your own projects.  Share and enjoy!
+
+
+swdp
+----
+
+Firmware for the LeafLabs Maple board to act as a USB<->SW-DP bridge,
+to allow host software to use Serial Wire Debug Protocol to access target
+devices.  It should be usable on just about any STM32F103 board.
+
+GPIO 0 -> SWDIO
+GPIO 1 -> SWCLK
+GPIO 5 -> Activity LED
+
+
+debugger & gdb-bridge
+---------------------
+
+A simple standalone debugger and a bridge for the GDB remote protocol
+that commicate with a board running swdp.
+
+
+stm32boot
+---------
+
+A tool to download code to RAM or flash, via the stm32f1xx ROM serial
+bootloader.
+
+
+usbmon
+------
+
+Commandline tool to observe the linux usb stack and io transactions
+through /dev/usbmon*
+
+
+Included Third Party Software
+-----------------------------
+
+linenoise.[ch] 
+  excellent tiny commandline editor (BSD license)
+  https://github.com/antirez/linenoise
+
+usb-linux.c
+  toolbox code for using usb linux devices from userspace
+  from the Android Open Source Project (BSD license)
+
+
+Useful Documents
+----------------
+
+ARM DDI0337E Cortex M3 r1p1 Technical Reference Manual
+  Has useful details on SW-DP and debug peripherals that was removed
+  in later versions of the TRM as "redundant" with other documents.
+
