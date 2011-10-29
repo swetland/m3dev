@@ -13,7 +13,7 @@ $(OUT)/$(M_NAME).bin: $(OUT)/$(M_NAME)
 $(OUT)/$(M_NAME).lst: _SRC := $(OUT)/$(M_NAME)
 $(OUT)/$(M_NAME).lst: $(OUT)/$(M_NAME)
 	@echo create $@
-	$(QUIET)$(TARGET_OBJDUMP) -D $(_SRC) > $@
+	$(QUIET)$(TARGET_OBJDUMP) -d $(_SRC) > $@
 
 $(OUT)/$(M_NAME): _OBJS := $(M_OBJS)
 $(OUT)/$(M_NAME): _LIBS := $(M_LIBS)
