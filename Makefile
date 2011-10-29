@@ -68,8 +68,8 @@ M_OBJS := tools/stm32boot.o
 include build/host-executable.mk
 
 M_NAME := swdp
-M_BASE := 0x20001000
-M_DATA := 0x20002000
+M_LINK := build/stm32f103-rom.ld
+#M_LINK := build/stm32f103-ram.ld
 M_OBJS := arch/stm32f1xx/start.o
 M_OBJS += swdp/main.o
 M_OBJS += swdp/swdp.o

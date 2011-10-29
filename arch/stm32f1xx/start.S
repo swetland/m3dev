@@ -11,11 +11,8 @@
 #define _IRQ(name) VECTOR(irq_##name)
 
 _start:
-	//.long 0x200001fc
-	//.long 0x1ffff021
 	.long 0x20005000
-	.long m3_reset - 0x20001000 + 0x08000000 + 1
-	//VECTOR(m3_reset)
+	.long reset + 1
 	VECTOR(m3_nmi)
 	VECTOR(m3_hardfault)
 	VECTOR(m3_mmu)
@@ -36,14 +33,28 @@ _start:
 deadloop:
 	b .
 
-m3_reset:
-	ldr r1, =0x08000000
-	ldr r2, =0x20001000
-	ldr r3, =0x20004000
-copymore:
+reset:
+	ldr r1, =__data_init__
+	ldr r2, =__data_start__
+	ldr r3, =__data_end__
+	ldr r4, =__bss_end__
+	mov r5, #0
+
+	/* if data init and start are the same, skip copy */
+	/* this simplifies building-for-ram */
+	cmp r1, r2
+	bne copydata
+	mov r2, r4
+	b zerobss
+
+copydata:
+	cmp r2, r3
+	beq zerobss
 	ldr r0, [r1], #4
 	str r0, [r2], #4
-	cmp r2, r3
-	bne copymore
-	ldr r1, =main
-	bx r1
+	b copydata
+zerobss:
+	cmp r2, r4
+	beq main
+	str r5, [r2], #4
+	b zerobss

@@ -47,6 +47,11 @@ struct raw {
 #define MSG_NULL	0x04
 #define MSG_ATTACH	0x05	/* execute sw reset + jtag handover */
 #define MSG_SWDP_OPS	0x06	/* pr0 (up to 12) SWDP operations */ 
+#define MSG_RESET_N	0x07	/* pr0 1=assert 0=release target RESET */
+
+/* host to target softload to 0x20001000 */
+#define MSG_DOWNLOAD	0x08	/* pr0 pr1 = LE word offset */
+#define MSG_EXECUTE	0x09
 
 /* low level ops - combine for direct AP/DP io */
 #define OP_RD 0x00

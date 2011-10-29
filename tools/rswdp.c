@@ -200,6 +200,12 @@ void swdp_enable_tracing(int yes) {
 	invoke(&msg, MSG_TRACE);
 }
 
+void swdp_target_reset(int enable) {
+	struct msg msg;
+	msg.pr0 = enable ? 1 : 0;
+	invoke(&msg, MSG_RESET_N);
+}
+
 int swdp_open(void) {
 	usb = usb_open(match_18d1_6502);
 	if (usb == 0) {

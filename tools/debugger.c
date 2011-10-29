@@ -238,6 +238,26 @@ void do_download(int argc, param *argv) {
 	} 
 }
 
+void do_reset(int argc, param *argv) {
+	if (argc > 0) {
+		swdp_target_reset(argv[0].n);
+	} else {
+		swdp_target_reset(1);
+		usleep(10000);
+		swdp_target_reset(0);
+	}
+}
+
+void do_reset_stop(int argc, param *argv) {
+	swdp_core_halt();
+	swdp_ahb_write(CDBG_EMCR, 1);
+	swdp_target_reset(1);
+	usleep(10000);
+	swdp_target_reset(0);
+	usleep(10000);
+	do_stop(0,0);
+}
+
 struct cmd CMD[] = {
 	{ "exit",	"", do_exit,	"" },
 	{ "attach",	"", do_attach,	"attach/reattach to sw-dp" },
@@ -249,6 +269,8 @@ struct cmd CMD[] = {
 	{ "dr",		"", do_dr,	"dump register" },
 	{ "wr",		"", do_wr,	"write register" },
 	{ "download",	"", do_download,"download file to device" },
+	{ "reset",	"", do_reset,	"reset target" },
+	{ "reset-stop",	"", do_reset_stop, "reset target and halt cpu" },
 };
 
 void execute(char *line) {

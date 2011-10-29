@@ -27,13 +27,19 @@
 extern unsigned swdp_trace;
 
 void clocks_to_72mhz() {
+	/* external oscillator enable */
 	writel(readl(RCC_CR) | 0x00010001, RCC_CR);
 	while ((readl(RCC_CR) & 0x00020000) == 0) ;
 
+	/* flash prefetch enable */
+	writel(0x12, 0x40022000);
+
+	/* configure PLL for 72MHz */
 	writel(readl(RCC_CFGR) | 0x001D0400, RCC_CFGR);
 	writel(readl(RCC_CR) | 0x01000000, RCC_CR);
 	while ((readl(RCC_CR) & 0x03000000) == 0) ;
 
+	/* set SYSCLK to PLL */
 	writel(readl(RCC_CFGR) | 2, RCC_CFGR);
 	while ((readl(RCC_CFGR) & 8) == 0) ;
 }
@@ -135,9 +141,12 @@ void process_swdp_message(struct msg *msg) {
 
 static struct msg msg;
 
-#define GPIO_LED 5
+#define GPIO_LED	5
+#define GPIO_RESET_N	3
 
 int main() {
+	void (*func)(void) = 0;
+
 	writel(readl(RCC_APB2ENR) |
 		RCC_APB2_GPIOA | RCC_APB2_USART1,
 		RCC_APB2ENR);
@@ -149,6 +158,7 @@ int main() {
 	bss_init();
 	serial_init(72000000, 115200);
 	printx("[ rswdp agent v0.9 ]\n");
+	printx("[ built " __DATE__ " " __TIME__ " ]\n");
 
 #if 0
 	irq_set_base(0x20001000);
@@ -185,10 +195,43 @@ int main() {
 			msg.msg = MSG_FAIL;
 			process_swdp_message(&msg);
 			break;
+		case MSG_RESET_N:
+			msg.msg = MSG_OKAY;
+			if (msg.pr0 == 0) {
+				/* deassert RESET */
+				gpio_config(GPIO_RESET_N,
+					GPIO_INPUT | GPIO_FLOATING);
+			} else {
+				/* assert RESET */
+				gpio_clr(GPIO_RESET_N);
+				gpio_config(GPIO_RESET_N,
+					GPIO_OUTPUT_10MHZ | GPIO_ALT_PUSH_PULL);
+			}
+			break;
+		case MSG_DOWNLOAD: {
+			unsigned *src, *dst, n;
+			msg.msg = MSG_OKAY;
+			src = (void*) &msg;
+			dst = (void*) 0x20001000;
+			src++;
+			dst += (msg.pr0 | (msg.pr1 << 8));
+			for (n = 0; n < 60; n++)
+				*dst++ = *src++;
+			break;
+		}
+		case MSG_EXECUTE:
+			msg.msg = MSG_OKAY;
+			func = (void*) ((unsigned*)0x20001000)[1];
+			break;
 		default:
 			msg.msg = MSG_FAIL;
 		}
 		usb_xmit(&msg, 64);
+
+		if (func) {
+			func();
+			for (;;) ;
+		}
 	}
 }
 

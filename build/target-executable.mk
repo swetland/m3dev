@@ -17,13 +17,11 @@ $(OUT)/$(M_NAME).lst: $(OUT)/$(M_NAME)
 
 $(OUT)/$(M_NAME): _OBJS := $(M_OBJS)
 $(OUT)/$(M_NAME): _LIBS := $(M_LIBS)
-$(OUT)/$(M_NAME): _BASE := $(M_BASE)
-$(OUT)/$(M_NAME): _DATA := $(M_DATA)
+$(OUT)/$(M_NAME): _LINK := $(M_LINK)
 $(OUT)/$(M_NAME): $(M_OBJS)
 	@echo link $@
-	$(QUIET)$(TARGET_LD) -Bstatic -Ttext $(_BASE) -Tdata $(_DATA) $(_OBJS) $(_LIBS) -o $@
+	$(QUIET)$(TARGET_LD) -Bstatic -T $(_LINK) $(_OBJS) $(_LIBS) -o $@
 
-#$(QUIET)$(TARGET_LD) -Bstatic -T aboot.lds -Ttext $(_BASE) $(_OBJS) $(_LIBS) -o $@
 
 M_OBJS :=
 M_NAME :=
