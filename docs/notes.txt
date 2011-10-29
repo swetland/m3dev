@@ -23,3 +23,21 @@ STM32F1xx
   - PCLK1 = HCLK / 1
   - PCLK2 = HCLK / 1
   - ADCCLK = PCLK2 / 2 (4MHz)
+
+gdb
+---
+making the disassembler behave:
+  set architecture armv4m
+  set arm fallback-mode thumb
+
+connecting/disconnecting:
+  target remote | out/gdb-bridge
+  disconnect
+
+turn on tracing for the remote wire protocol
+  set debug remote 1
+
+disassemble 4 instructions at pc
+  x/4i $pc
+
+

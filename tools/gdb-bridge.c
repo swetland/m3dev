@@ -24,6 +24,7 @@
 
 #include <fw/types.h>
 #include "rswdp.h"
+#include <protocol/rswdp.h>
 
 struct gdbcnxn {
 	int tx, rx;
@@ -112,6 +113,11 @@ again:
 	do {
 		c = gdb_getc(gc);
 		if (c < 0) goto fail;
+		if (c == 3) {
+			buf[0] = 's';
+			buf[1] = 0;
+			return 0;
+		}
 		if (c < 0x20)
 			fprintf(stderr,"! %02x !\n",c);
 	} while (c != '$');
@@ -150,12 +156,56 @@ fail:
 	return -1;
 }
 
-unsigned data[512];
+u8 data[1028];
+
+void read_memory(u32 addr, int count, u8 *data) {
+	if (addr & 1) {
+		swdp_ahb_write(AHB_CSW, AHB_CSW_MDEBUG | AHB_CSW_PRIV |
+			AHB_CSW_DBG_EN | AHB_CSW_8BIT);
+		while (count > 0) {
+			u32 tmp;
+			swdp_ahb_read(addr, &tmp);
+			*((u16*) data) = tmp >> (8 * (addr & 3));
+			data++;
+			count--;
+		}
+		swdp_ahb_write(AHB_CSW, AHB_CSW_MDEBUG | AHB_CSW_PRIV |
+			AHB_CSW_DBG_EN | AHB_CSW_32BIT);
+	} else if (addr & 2) {
+		swdp_ahb_write(AHB_CSW, AHB_CSW_MDEBUG | AHB_CSW_PRIV |
+			AHB_CSW_DBG_EN | AHB_CSW_16BIT);
+		while (count > 0) {
+			u32 tmp;
+			swdp_ahb_read(addr, &tmp);
+			*((u16*) data) = tmp >> (8 * (addr & 2));
+			data += 2;
+			count -= 2;
+		}
+		swdp_ahb_write(AHB_CSW, AHB_CSW_MDEBUG | AHB_CSW_PRIV |
+			AHB_CSW_DBG_EN | AHB_CSW_32BIT);
+	} else {
+		while (count > 0) {
+			swdp_ahb_read(addr, (u32*) data);
+			data += 4;
+			count -= 4;
+		}
+	}
+		
+	
+}
 
 void handle_command(struct gdbcnxn *gc, char *cmd)
 {
 	unsigned n,x,i;
 
+	/* silent (no-response) commands */
+	switch (cmd[0]) {
+	case 'c':
+		swdp_core_resume();
+		return;
+	}
+
+	gdb_prologue(gc);
 	switch (cmd[0]) {
 	case '?':
 		gdb_puts(gc, "S00");
@@ -167,27 +217,31 @@ void handle_command(struct gdbcnxn *gc, char *cmd)
 	case 'm':
 		if (sscanf(cmd + 1, "%x,%x", &x, &n) != 2)
 			break;
-		n = ((n + 3) & (~3)) / 4;
 
-		//fprintf(stderr,"%x %x\n", x, n);
-		for (i = 0; i < n; i++) {
-			swdp_ahb_read(x, data + i);
-			x += 4;
-		}
-		gdb_puthex(gc, data, 4 * n);
+		if (n > 1024) n = 1024;	
+		read_memory(x, n, data);
+		gdb_puthex(gc, data, n);
 		break;	
 	case 'g':
-		for (n = 0; n < 18; n++)
-			swdp_core_read(n, &data[n]);
-		gdb_puthex(gc, data, 4 * 18);
+		for (n = 0; n < 18; n++) {
+			u32 tmp;
+			swdp_core_read(n, &tmp);
+			gdb_puthex(gc, &tmp, 4);
+		}
+		break;
+	case 's':
+		swdp_core_step();
+		gdb_puts(gc, "S00");
 		break;
 	}
+	gdb_epilogue(gc);
 }
 
 void handler(int n) {
 }
 
 int main(int argc, char **argv) {
+	int r;
 	struct gdbcnxn gc;
 	char cmd[32768];
 	gc.tx = 1;
@@ -207,9 +261,7 @@ int main(int argc, char **argv) {
 			return 0;
 		}
 		//fprintf(stderr,"PKT: %s\n", cmd);
-		gdb_prologue(&gc);
 		handle_command(&gc, cmd);
-		gdb_epilogue(&gc);
 	}
 	return 0;
 }

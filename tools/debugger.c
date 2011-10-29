@@ -193,6 +193,45 @@ void do_dw(int argc, param *argv) {
 	printf("\n");
 }
 
+
+void do_db(int argc, param *argv) {
+	u32 addr, count;
+	u8 data[1024];
+	unsigned n;
+	if (argc < 2)
+		return;
+
+	addr = argv[0].n;
+	count = argv[1].n;
+
+	if (count > 1024)
+		count = 1024;
+
+	memset(data, 0xee, 1024);
+
+
+	swdp_ahb_write(AHB_CSW, AHB_CSW_MDEBUG | AHB_CSW_PRIV |
+		AHB_CSW_DBG_EN | AHB_CSW_8BIT);
+	for (n = 0; n < count; n++) {
+		u32 tmp;
+		if (swdp_ahb_read(addr + n, &tmp)) {
+			swdp_reset();
+			break;
+		}
+		data[n] = tmp >> (8 * (n & 3));
+	}
+
+	swdp_ahb_write(AHB_CSW, AHB_CSW_MDEBUG | AHB_CSW_PRIV |
+		AHB_CSW_DBG_EN | AHB_CSW_32BIT);
+
+	for (n = 0; n < count; n++) {
+		if ((n & 15) == 0)
+			printf("\n%08x:", addr + n);
+		printf(" %02x", data[n]);
+	}
+	printf("\n");
+}
+
 void do_download(int argc, param *argv) {
 	u32 addr;
 	u8 data[32768];
@@ -266,6 +305,7 @@ struct cmd CMD[] = {
 	{ "step",	"", do_step,	"single-step cpu" },
 	{ "go",		"", do_resume,	"resume cpu" },
 	{ "dw",		"", do_dw,	"dump words" },
+	{ "db",		"", do_db,	"dump bytes" },
 	{ "dr",		"", do_dr,	"dump register" },
 	{ "wr",		"", do_wr,	"write register" },
 	{ "download",	"", do_download,"download file to device" },
@@ -318,7 +358,7 @@ int main(int argc, char **argv) {
 		fprintf(stderr,"could not find device\n");
 		return -1;
 	}
-
+//	swdp_enable_tracing(1);
 	while ((line = linenoise("debugger> ")) != NULL) {
 		if (line[0] == 0)
 			continue;
