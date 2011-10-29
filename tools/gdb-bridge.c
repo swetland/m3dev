@@ -190,8 +190,15 @@ void read_memory(u32 addr, int count, u8 *data) {
 			count -= 4;
 		}
 	}
-		
-	
+}
+
+
+void handle_ext_command(struct gdbcnxn *gc, char *cmd, char *args)
+{
+	if (!strcmp(cmd,"Rcmd")) {
+		printf("monitor: %s\n", args);
+		gdb_puthex(gc, "hello\n", 6);
+	}
 }
 
 void handle_command(struct gdbcnxn *gc, char *cmd)
@@ -233,6 +240,19 @@ void handle_command(struct gdbcnxn *gc, char *cmd)
 		swdp_core_step();
 		gdb_puts(gc, "S00");
 		break;
+	case 'q': {
+		char *args = ++cmd;
+		while (*args) {
+			if (*args == ',') {
+				*args++ = 0;
+				break;
+			}
+			args++;
+		}
+		handle_ext_command(gc, cmd, args);
+		break;
+		
+	}
 	}
 	gdb_epilogue(gc);
 }
