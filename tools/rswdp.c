@@ -279,6 +279,17 @@ int swdp_core_read(u32 n, u32 *v) {
 	return q_exec(&t);
 }
 
+int swdp_core_read_all(u32 *v) {
+	struct txn t;
+	unsigned n;
+	q_init(&t);
+	for (n = 0; n < 19; n++) {
+		q_ahb_write(&t, CDBG_REG_ADDR, n & 0x1F);
+		q_ahb_read(&t, CDBG_REG_DATA, v++);
+	}
+	return q_exec(&t);
+}
+
 int swdp_core_halt(void) {
 	u32 n;
 	if (swdp_ahb_read(CDBG_CSR, &n))

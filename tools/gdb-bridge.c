@@ -230,13 +230,12 @@ void handle_command(struct gdbcnxn *gc, char *cmd)
 		swdp_ahb_read32(x & (~3), tmp.w, ((n + 3) & (~3)) / 4);
 		gdb_puthex(gc, tmp.b + (x & 3), n);
 		break;	
-	case 'g':
-		for (n = 0; n < 18; n++) {
-			u32 tmp;
-			swdp_core_read(n, &tmp);
-			gdb_puthex(gc, &tmp, 4);
-		}
+	case 'g':  {
+		u32 regs[19];
+		swdp_core_read_all(regs);
+		gdb_puthex(gc, regs, sizeof(regs));
 		break;
+	}
 	case 's':
 		swdp_core_step();
 		gdb_puts(gc, "S00");

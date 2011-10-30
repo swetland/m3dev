@@ -56,9 +56,7 @@ void do_attach(int argc, param *argv) {
 static u32 lastregs[19];
 
 void do_regs(int argc, param *argv) {
-	unsigned n;
-	for (n = 0; n < 19; n++)
-		swdp_core_read(n, lastregs + n);
+	swdp_core_read_all(lastregs);
 
 	xprintf("r0 %08x r4 %08x r8 %08x ip %08x psr %08x\n",
 		lastregs[0], lastregs[4], lastregs[8],
