@@ -17,6 +17,7 @@
 
 #include <stdio.h>
 #include <stdlib.h>
+#include <stdarg.h>
 #include <unistd.h>
 #include <string.h>
 #include <errno.h>
@@ -156,54 +157,52 @@ fail:
 	return -1;
 }
 
-u8 data[1028];
-
-void read_memory(u32 addr, int count, u8 *data) {
-	if (addr & 1) {
-		swdp_ahb_write(AHB_CSW, AHB_CSW_MDEBUG | AHB_CSW_PRIV |
-			AHB_CSW_DBG_EN | AHB_CSW_8BIT);
-		while (count > 0) {
-			u32 tmp;
-			swdp_ahb_read(addr, &tmp);
-			*((u16*) data) = tmp >> (8 * (addr & 3));
-			data++;
-			count--;
-		}
-		swdp_ahb_write(AHB_CSW, AHB_CSW_MDEBUG | AHB_CSW_PRIV |
-			AHB_CSW_DBG_EN | AHB_CSW_32BIT);
-	} else if (addr & 2) {
-		swdp_ahb_write(AHB_CSW, AHB_CSW_MDEBUG | AHB_CSW_PRIV |
-			AHB_CSW_DBG_EN | AHB_CSW_16BIT);
-		while (count > 0) {
-			u32 tmp;
-			swdp_ahb_read(addr, &tmp);
-			*((u16*) data) = tmp >> (8 * (addr & 2));
-			data += 2;
-			count -= 2;
-		}
-		swdp_ahb_write(AHB_CSW, AHB_CSW_MDEBUG | AHB_CSW_PRIV |
-			AHB_CSW_DBG_EN | AHB_CSW_32BIT);
-	} else {
-		while (count > 0) {
-			swdp_ahb_read(addr, (u32*) data);
-			data += 4;
-			count -= 4;
-		}
-	}
+unsigned unhex(char *x) {
+	unsigned n;
+	char t = x[2];
+	x[2] = 0;
+	n = strtoul(x, 0, 16);
+	x[2] = t;
+ 	return n;
 }
 
+static struct gdbcnxn *GC;
+
+void xprintf(const char *fmt, ...) {
+	char buf[256];
+	va_list ap;
+	va_start(ap, fmt);
+	vsnprintf(buf, sizeof(buf), fmt, ap);
+	buf[sizeof(buf)-1] = 0;
+	va_end(ap);
+	gdb_puthex(GC, buf, strlen(buf));
+}
+
+void debugger_command(char *line);
 
 void handle_ext_command(struct gdbcnxn *gc, char *cmd, char *args)
 {
 	if (!strcmp(cmd,"Rcmd")) {
-		printf("monitor: %s\n", args);
-		gdb_puthex(gc, "hello\n", 6);
+		char *p = args;
+		cmd = p;
+		while (p[0] && p[1]) {
+			*cmd++ = unhex(p);
+			p+=2;
+		}
+		*cmd = 0;
+		GC = gc;
+		debugger_command(args);
 	}
 }
 
 void handle_command(struct gdbcnxn *gc, char *cmd)
 {
-	unsigned n,x,i;
+	union {
+		u32 w[256+2];
+		u16 h[512+4];
+		u8 b[1024+8];
+	} tmp;
+	unsigned n,x;
 
 	/* silent (no-response) commands */
 	switch (cmd[0]) {
@@ -225,9 +224,11 @@ void handle_command(struct gdbcnxn *gc, char *cmd)
 		if (sscanf(cmd + 1, "%x,%x", &x, &n) != 2)
 			break;
 
-		if (n > 1024) n = 1024;	
-		read_memory(x, n, data);
-		gdb_puthex(gc, data, n);
+		if (n > 1024)
+			n = 1024;
+		 
+		swdp_ahb_read32(x & (~3), tmp.w, ((n + 3) & (~3)) / 4);
+		gdb_puthex(gc, tmp.b + (x & 3), n);
 		break;	
 	case 'g':
 		for (n = 0; n < 18; n++) {
@@ -261,7 +262,6 @@ void handler(int n) {
 }
 
 int main(int argc, char **argv) {
-	int r;
 	struct gdbcnxn gc;
 	char cmd[32768];
 	gc.tx = 1;
