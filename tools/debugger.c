@@ -162,7 +162,7 @@ static u32 lastaddr = 0x20000000;
 static u32 lastcount = 0x40;
 
 void do_dw(int argc, param *argv) {
-	u32 data[256];
+	u32 data[4096];
 	u32 addr = lastaddr;
 	u32 count = lastcount;
 	unsigned n;
@@ -175,8 +175,8 @@ void do_dw(int argc, param *argv) {
 	/* word align */
 	addr = (addr + 3) & ~3;
 	count = (count + 3) & ~3;
-	if (count > 1024)
-		count = 1024;
+	if (count > sizeof(data))
+		count = sizeof(data);
 
 	lastaddr = addr + count;
 	lastcount = count;

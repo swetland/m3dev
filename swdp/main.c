@@ -24,6 +24,12 @@
 #include <protocol/rswdp.h>
 #include "swdp.h"
 
+#define TRACE 0
+
+#define GPIO_LED	5
+#define GPIO_RESET_N	3
+
+
 extern unsigned swdp_trace;
 
 void clocks_to_72mhz() {
@@ -54,30 +60,20 @@ void bss_init() {
 		*bss++ = 0;
 }
 
-int online = 0;
-int check_target(void) { 
-	if (!online) {
-		printx("swdp_reset()\n");
-		if (swdp_reset() != IDCODE_M3)
-			return -1;
-		online = 1;
-		printx("online\n");
-	}
-	return 0;
-}
-
-#define DEBUG_MAX 59
-
-static struct raw pmsg = {
-	.msg = MSG_DEBUG,
-	.seq = 0xFF,
-	.pr0 = 0x00,
-	.pr1 = 0x01,
+#define DEBUG_MAX 52
+static struct {
+	u32 txn;
+	u32 cmd;
+	u8 data[DEBUG_MAX];
+} pmsg = {
+	.txn = RSWD_TXN_ASYNC,
+	.cmd = RSWD_MSG(CMD_DEBUG_PRINT, 0, DEBUG_MAX/4),
 };
 static unsigned poff = 0;
 
 void flushu(void) {
-	pmsg.data[poff] = 0;
+	while (poff < DEBUG_MAX)
+		pmsg.data[poff++] = 0;
 	usb_xmit(&pmsg, sizeof(pmsg));
 	poff = 0;
 }
@@ -116,36 +112,120 @@ static u8 optable[16] = {
 	[OP_WR | OP_AP | OP_XC] = WR_AP3,
 };
 
-void process_swdp_message(struct msg *msg) {
-	unsigned count = msg->pr0;
-	unsigned n;
+/* TODO bounds checking -- we trust the host far too much */
+void process_txn(u32 txnid, u32 *rx, int rxc, u32 *tx) {
+	unsigned msg, op, n;
+	unsigned txc = 1;
+	unsigned count = 0;
+	unsigned status = 0;
+	void (*func)(void) = 0;
 
-	if (count > 12) {
-		printx("error: >12 swdp ops\n");
-		return;
-	}
-	for (n = 0; n < count; n++) {
-		unsigned op = msg->op[n];
-		if (op > 15) {
-			printx("error: swdp opcode invalid\n");
-			return;
+	tx[0] = txnid;
+
+	while (rxc-- > 0) {
+		count++;
+		msg = *rx++;
+		op = RSWD_MSG_OP(msg);
+		n = RSWD_MSG_ARG(msg);
+#if TRACE
+		printx("> %b %b %h <\n", RSWD_MSG_CMD(msg), op, n);
+#endif
+		switch (RSWD_MSG_CMD(msg)) {
+		case CMD_NULL:
+			continue;
+		case CMD_SWD_WRITE:
+			while (n-- > 0) {
+				rxc--;
+				if (swdp_write(optable[op], *rx++)) {
+					status = 3;
+					goto done;
+				}
+			}
+			continue;
+		case CMD_SWD_READ:
+			tx[txc++] = RSWD_MSG(CMD_SWD_DATA, 0, n); 
+			while (n-- > 0) {
+				if (swdp_read(optable[op], tx + txc)) {
+					while (n-- > 0)
+						tx[txc++] = 0xfefefefe;
+					status = 3;
+					goto done;
+				}
+				txc++;
+			}
+			continue;
+		case CMD_SWD_DISCARD:
+			while (n-- > 0) {
+				u32 tmp;
+				if (swdp_read(optable[op], &tmp)) {
+					status = 3;
+					goto done;
+				}
+			}
+			continue;
+		case CMD_ATTACH:
+			swdp_reset();
+			continue;
+		case CMD_RESET:
+			if (n == 0) {
+				/* deassert RESET */
+				gpio_config(GPIO_RESET_N,
+					GPIO_INPUT | GPIO_FLOATING);
+			} else {
+				/* assert RESET */
+				gpio_clr(GPIO_RESET_N);
+				gpio_config(GPIO_RESET_N,
+					GPIO_OUTPUT_10MHZ | GPIO_ALT_PUSH_PULL);
+			}
+			continue;
+		case CMD_DOWNLOAD: {
+			u32 *addr = (void*) *rx++;
+			rxc--;
+			while (n) {
+				*addr++ = *rx++;
+				rxc--;
+			}
+			continue;
 		}
-		if (op & OP_WR) {
-			swdp_write(optable[op], msg->data[n]);
-		} else {
-			msg->data[n] = swdp_read(optable[op]);
+		case CMD_EXECUTE:
+			func = (void*) *rx++;
+			rxc--;
+			continue;
+		case CMD_TRACE:
+			swdp_trace = op;
+			continue;
+		default:
+			printx("unknown command %b\n", RSWD_MSG_CMD(msg));
+			status = 1;
+			goto done;
 		}
 	}
-	msg->msg = MSG_OKAY;
+
+done:
+	tx[txc++] = RSWD_MSG(CMD_STATUS, status, count);
+	if ((txc & 0x3f) == 0)
+		tx[txc++] = RSWD_MSG(CMD_NULL, 0, 0);
+
+#if TRACE
+	printx("[ send %x words ]\n", txc);
+	for (n = 0; n < txc; n+=4) {
+		printx("%x %x %x %x\n",
+			tx[n], tx[n+1], tx[n+2], tx[n+3]);
+	}
+#endif
+	usb_xmit(tx, txc * 4);
+
+	if (func) {
+		func();
+		for (;;) ;
+	}	
 }
 
-static struct msg msg;
-
-#define GPIO_LED	5
-#define GPIO_RESET_N	3
+static u32 rxbuffer[1024];
+static u32 txbuffer[1024];
 
 int main() {
-	void (*func)(void) = 0;
+	int rxc;
 
 	writel(readl(RCC_APB2ENR) |
 		RCC_APB2_GPIOA | RCC_APB2_USART1,
@@ -170,68 +250,30 @@ int main() {
 
 	for (;;) {
 		gpio_clr(GPIO_LED);
-		if (usb_recv(&msg) != 64) {
-			printx("error: runt message\n");
-			continue;
-		}
+		rxc = usb_recv(rxbuffer, sizeof(rxbuffer));
 		gpio_set(GPIO_LED);
-		switch (msg.msg) {
-		case MSG_NULL:
-			msg.msg = MSG_OKAY;
-			break;
-		case MSG_DEBUG:
-			((char*) &msg)[63] = 0;
-			printx(((char*) &msg) + 4);
-			continue;
-		case MSG_TRACE:
-			msg.msg = MSG_OKAY;
-			swdp_trace = msg.pr0;
-			break;
-		case MSG_ATTACH:
-			msg.msg = MSG_OKAY;
-			msg.data[0] = swdp_reset();
-			break;
-		case MSG_SWDP_OPS:
-			msg.msg = MSG_FAIL;
-			process_swdp_message(&msg);
-			break;
-		case MSG_RESET_N:
-			msg.msg = MSG_OKAY;
-			if (msg.pr0 == 0) {
-				/* deassert RESET */
-				gpio_config(GPIO_RESET_N,
-					GPIO_INPUT | GPIO_FLOATING);
-			} else {
-				/* assert RESET */
-				gpio_clr(GPIO_RESET_N);
-				gpio_config(GPIO_RESET_N,
-					GPIO_OUTPUT_10MHZ | GPIO_ALT_PUSH_PULL);
-			}
-			break;
-		case MSG_DOWNLOAD: {
-			unsigned *src, *dst, n;
-			msg.msg = MSG_OKAY;
-			src = (void*) &msg;
-			dst = (void*) 0x20001000;
-			src++;
-			dst += (msg.pr0 | (msg.pr1 << 8));
-			for (n = 0; n < 60; n++)
-				*dst++ = *src++;
-			break;
-		}
-		case MSG_EXECUTE:
-			msg.msg = MSG_OKAY;
-			func = (void*) ((unsigned*)0x20001000)[1];
-			break;
-		default:
-			msg.msg = MSG_FAIL;
-		}
-		usb_xmit(&msg, 64);
 
-		if (func) {
-			func();
-			for (;;) ;
+#if TRACE
+		int n;
+		printx("[ recv %x words ]\n", rxc/4);
+		for (n = 0; n < (rxc/4); n+=4) {
+			printx("%x %x %x %x\n",
+				rxbuffer[n], rxbuffer[n+1], rxbuffer[n+2], rxbuffer[n+3]);
 		}
+#endif
+
+		if ((rxc < 4) || (rxc & 3)) {
+			printx("error, runt frame, or strange frame... %x\n", rxc);
+			continue;
+		}
+
+		rxc = rxc / 4;
+
+		if ((rxbuffer[0] & 0xFFFF0000) != 0xAA770000) {
+			printx("invalid frame %x\n", rxbuffer[0]);
+			continue;
+		}
+
+		process_txn(rxbuffer[0], rxbuffer + 1, rxc - 1, txbuffer);
 	}
 }
-

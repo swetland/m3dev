@@ -113,7 +113,7 @@ static void puth(unsigned hdr, unsigned n, unsigned v) {
 		v);
 }
 
-unsigned swdp_read(unsigned hdr) {
+int swdp_read(unsigned hdr, unsigned *v) {
 	unsigned n,m,o;
 
 	gpio_clr(2);
@@ -139,10 +139,11 @@ unsigned swdp_read(unsigned hdr) {
 	if (swdp_trace || (n != 1))
 		puth(hdr >> 8, n, m);
 
-	return m;
+	*v = m;
+	return (n == 1) ? 0 : -1;
 }
 
-void swdp_write(unsigned hdr, unsigned val) {
+int swdp_write(unsigned hdr, unsigned val) {
 	unsigned n;
 
 	for (n = 0; n < 8; n++) {
@@ -164,9 +165,11 @@ void swdp_write(unsigned hdr, unsigned val) {
 
 	if (swdp_trace || (n != 1))
 		puth(hdr >> 8, n, val);
+
+	return (n == 1) ? 0 : -1;
 }
 
-unsigned swdp_reset(void) {
+void swdp_reset(void) {
 	gpio_set(GPIO_CLK);
 	gpio_set(GPIO_DAT);
 	gpio_config(GPIO_CLK, GPIO_OUTPUT_10MHZ | GPIO_OUT_PUSH_PULL);
@@ -180,7 +183,5 @@ unsigned swdp_reset(void) {
 	clock_jtag2swdp();
 	clock_high(64);
 	clock_low(8);
-
-	return swdp_read(RD_IDCODE);
 }
 

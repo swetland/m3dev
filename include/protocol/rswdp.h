@@ -20,40 +20,49 @@
 #ifndef _RSWDP_PROTOCOL_H_
 #define _RSWDP_PROTOCOL_H_
 
-struct msg {
-	u8 msg;
-	u8 seq;
-	u8 pr0;
-	u8 pr1;
-	u8 op[12];
-	u32 data[12];
-};
+/* Basic framing:
+ * - host and device exchange "transactions" consisting of
+ *   some number of "messages".
+ * - each "message" has a 32bit header and may have 0 or more 
+ *   32bit words of payload 
+ * - a transaction may not exceed 4K (1024 words)
+ * - a transaction is sent in a series of USB BULK packets
+ * - the final packet must be a short packet unless the 
+ *   transaction is exactly 4K in length
+ * - packets must be a multiple of 4 bytes
+ * - the first message in a transaction must be 
+ *   CMD_TXN_START or CMD_TXN_ASYNC
+ */
 
-struct raw {
-	u8 msg;
-	u8 seq;
-	u8 pr0;
-	u8 pr1;
-	u8 data[60];
-};
+#define RSWD_MSG(cmd,op,n)	((((cmd)&0xFF) << 24) | (((op) & 0xFF)<<16) | ((n) & 0xFFFF))
+#define RSWD_MSG_CMD(n)		(((n) >> 24) & 0xFF)
+#define RSWD_MSG_OP(n)		(((n) >> 16) & 0xFF)
+#define RSWD_MSG_ARG(n)		((n) & 0xFFFF)
 
-/* target to host messages */
-#define MSG_OKAY	0x00	/* response to MSG with matching seq */
-#define MSG_FAIL	0x01	/* failure response to MSG with matching seq */
-#define MSG_DEBUG	0x02	/* debug print */
-#define MSG_TRACE	0x03	/* pr0 = 1 -> enable tracing */
+#define RSWD_TXN_START(seq)	(0xAA770000 | ((seq) & 0xFFFF))
+#define RSWD_TXN_ASYNC		(0xAA001111)
 
-/* host to target messages */
-#define MSG_NULL	0x04
-#define MSG_ATTACH	0x05	/* execute sw reset + jtag handover */
-#define MSG_SWDP_OPS	0x06	/* pr0 (up to 12) SWDP operations */ 
-#define MSG_RESET_N	0x07	/* pr0 1=assert 0=release target RESET */
+/* valid: either */
+#define CMD_NULL	0x00 /* used for padding */
 
-/* host to target softload to 0x20001000 */
-#define MSG_DOWNLOAD	0x08	/* pr0 pr1 = LE word offset */
-#define MSG_EXECUTE	0x09
+/* valid: host to target */
+#define CMD_SWD_WRITE	0x01 /* op=addr arg=count payload: data x count */
+#define CMD_SWD_READ	0x02 /* op=addr arg=count payload: data x count */
+#define CMD_SWD_DISCARD	0x03 /* op=addr arg=count payload: none (discards) */
+#define CMD_ATTACH	0x04 /* do swdp reset/connect handshake */
+#define CMD_RESET	0x05 /* arg=1 -> assert RESETn, otherwise deassert */ 
+#define CMD_DOWNLOAD	0x06 /* arg=wordcount, payload: addr x 1, data x n */
+#define CMD_EXECUTE	0x07 /* payload: addr x 1 */
+#define CMD_TRACE	0x08 /* op=tracebits n=0 */
 
-/* low level ops - combine for direct AP/DP io */
+/* valid: target to host */
+#define CMD_STATUS	0x10 /* op=errorcode, arg=commands since last TXN_START */
+#define CMD_SWD_DATA	0x11 /* op=0 arg=count, payload: data x count */
+
+/* valid: target to host async */
+#define CMD_DEBUG_PRINT	0x20 /* arg*4 bytes of ascii debug output */
+
+/* CMD_SWD_OP operations - combine for direct AP/DP io */
 #define OP_RD 0x00
 #define OP_WR 0x01
 #define OP_DP 0x00

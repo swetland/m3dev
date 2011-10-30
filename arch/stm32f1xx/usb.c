@@ -293,49 +293,80 @@ void usb_handle_ep1(void) {
 	}
 }
 
-int usb_recv(void *data) {
+int usb_recv(void *_data, int count) {
+	int r, rx = 0;
 	unsigned n;
+	u8 *data = _data;
 
 	while (!usb_online)
 		usb_handle_irq();
 
-	ep1_rx_data = data;
-	ep1_rx_status = -EBUSY;
+	while (count > 0) {
+		if (!usb_online)
+			return -ENODEV;
 
-	/* move from NAK to VALID, don't touch any other bits */
-	n = readl(USB_EPR(1)) & EPMASK;
-	writel(n | USB_EPR_CTR_RX | USB_EPR_CTR_TX | USB_EPR_RX_STALL, USB_EPR(1));
+		ep1_rx_data = data;
+		ep1_rx_status = -EBUSY;
 
-	while (ep1_rx_status == -EBUSY)
-		usb_handle_irq();
+		/* move from NAK to VALID, don't touch any other bits */
+		n = readl(USB_EPR(1)) & EPMASK;
+		writel(n | USB_EPR_CTR_RX | USB_EPR_CTR_TX | USB_EPR_RX_STALL, USB_EPR(1));
 
-	return ep1_rx_status;
+		while (ep1_rx_status == -EBUSY)
+			usb_handle_irq();
+
+		r = ep1_rx_status;
+
+		if (r < 0)
+			return r;
+		if (r > count)
+			r = count;
+		data += r;
+		rx += r;
+		count -= r;	
+
+		/* terminate on short packet */
+		if (r != 64)
+			break;
+	}
+
+	return rx;
 }
 
 int usb_xmit(void *data, int len) {
+	int tx = 0;
 	int n;
-	u32 *dst = (void*) ep1txb;
 	u16 *src = data;
 
-	if (!usb_online)
-		return -ENODEV;
-
-	while (ep1_tx_busy)
-		usb_handle_irq();
-
-	writel(len, USB_COUNT_TX(1));
 	while (len > 0) {
-		*dst++ = *src++;
-		len -= 2;
+		u32 *dst = (void*) ep1txb;
+		int xfer = (len > 64) ? 64 : len;
+
+		if (!usb_online)
+			return -ENODEV;
+
+		while (ep1_tx_busy)
+			usb_handle_irq();
+
+		writel(xfer, USB_COUNT_TX(1));
+		//printx("%x <- %x (%x)\n",dst, src, xfer);
+		len -= xfer;
+		tx += xfer;
+
+		while (xfer > 0) {
+			*dst++ = *src++;
+			xfer -= 2;
+		}
+
+		/* move from NAK to VALID, don't touch any other bits */
+		n = readl(USB_EPR(1)) & EPMASK;
+		writel(n | USB_EPR_CTR_RX | USB_EPR_CTR_TX | USB_EPR_TX_STALL, USB_EPR(1));
+
+		ep1_tx_busy = 1;
+
 	}
 
-	/* move from NAK to VALID, don't touch any other bits */
-	n = readl(USB_EPR(1)) & EPMASK;
-	writel(n | USB_EPR_CTR_RX | USB_EPR_CTR_TX | USB_EPR_TX_STALL, USB_EPR(1));
-
-	ep1_tx_busy = 1;
-
-	return len;
+	return tx;
 }
 
 void usb_init(void) {

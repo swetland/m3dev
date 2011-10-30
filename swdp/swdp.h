@@ -18,9 +18,9 @@
 #ifndef _SWDP_H_
 #define _SWDP_H_
 
-unsigned swdp_reset(void);
-void swdp_write(unsigned reg, unsigned val);
-unsigned swdp_read(unsigned reg);
+void swdp_reset(void);
+int swdp_write(unsigned reg, unsigned val);
+int swdp_read(unsigned reg, unsigned *val);
 
 unsigned swdp_ap_write(unsigned reg, unsigned val);
 unsigned swdp_ap_read(unsigned reg);

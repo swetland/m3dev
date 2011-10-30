@@ -35,7 +35,7 @@ void gpio_set(unsigned n);
 void gpio_clr(unsigned n);
 
 void usb_init(void);
-int usb_recv(void *data);
+int usb_recv(void *data, int len);
 int usb_xmit(void *data, int len);
 
 #endif
