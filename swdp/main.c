@@ -146,6 +146,7 @@ void process_txn(u32 txnid, u32 *rx, int rxc, u32 *tx) {
 			tx[txc++] = RSWD_MSG(CMD_SWD_DATA, 0, n); 
 			while (n-- > 0) {
 				if (swdp_read(optable[op], tx + txc)) {
+					txc++;
 					while (n-- > 0)
 						tx[txc++] = 0xfefefefe;
 					status = 3;
