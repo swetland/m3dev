@@ -63,6 +63,7 @@ struct raw {
 #define OP_X8 0x08
 #define OP_XC 0x0C
 
+/* DP registers */
 #define DP_IDCODE	(OP_DP|OP_X0)
 #define DP_ABORT	(OP_DP|OP_X0)
 #define DP_DPCTRL	(OP_DP|OP_X4)
@@ -91,7 +92,7 @@ struct raw {
 #define AHB_CSW_32BIT	(2 << 0)
 
 /* Core Debug registers */
-#define CDBG_CSR		0xE000EDF0	
+#define CDBG_CSR		0xE000EDF0
 #define CDBG_REG_ADDR		0xE000EDF4
 #define CDBG_REG_DATA		0xE000EDF8
 #define CDBG_EMCR		0xE000EDFC

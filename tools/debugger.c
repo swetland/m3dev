@@ -182,9 +182,7 @@ void do_dw(int argc, param *argv) {
 	lastcount = count;
 
 	count /= 4;
-	for (n = 0; n < count; n++)
-		swdp_ahb_read(addr + (n << 2), data + n);
-
+	swdp_ahb_read32(addr, data, count);
 	for (n = 0; n < count; n++) {
 		if ((n & 3) == 0)
 			printf("\n%08x:", addr + (n << 2));

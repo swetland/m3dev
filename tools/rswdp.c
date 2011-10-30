@@ -26,7 +26,7 @@
 #include <protocol/rswdp.h>
 #include "rswdp.h"
 
-int match_18d1_6502(usb_ifc_info *ifc) {
+static int match_18d1_6502(usb_ifc_info *ifc) {
 	if (ifc->dev_vendor != 0x18d1)
 		return -1;
 	if (ifc->dev_product != 0x6502)
@@ -38,7 +38,7 @@ static u8 sequence = 1;
 
 static usb_handle *usb;
 
-int invoke(struct msg *msg, unsigned kind) {
+static int invoke(struct msg *msg, unsigned kind) {
 	unsigned seq = sequence++;
 	int r;
 
@@ -77,59 +77,145 @@ int invoke(struct msg *msg, unsigned kind) {
 	}
 }
 
+struct txn {
+	struct msg m;
+	unsigned count;
+	u32 cache_apaddr;
+	u32 cache_ahbtar;
+	u8 src[12];
+	u32 *dst[12];
+};
+
+static void q_init(struct txn *t) {
+	memset(t, 0, sizeof(*t));
+	t->cache_apaddr = 0xffffffff;
+	t->cache_ahbtar = 0xffffffff;
+}
+
+static inline void q_result(struct txn *t, u32 *out) {
+	t->src[t->count] = t->m.pr0;
+	t->dst[t->count] = out;
+	t->count++;
+}
+
+static int q_exec(struct txn *t) {
+	int r, n;
+	if (t->m.pr0 != 0) {
+		printf("q_exec() %d ops, %d outs\n", t->m.pr0, t->count);
+		r = invoke(&t->m, MSG_SWDP_OPS);
+		for (n = 0; n < t->count; n++)
+			*(t->dst[n]) = t->m.data[t->src[n]];
+		return r;
+	} else {
+		return 0;
+	}
+}
+
+static void q_ap_select(struct txn *t, u32 addr) {
+	addr &= 0xF0;
+	if (t->cache_apaddr != addr) {
+		t->m.op[t->m.pr0] = OP_WR | DP_SELECT;
+		t->m.data[t->m.pr0] = addr;
+		t->m.pr0++;
+		t->cache_apaddr = addr;
+	}
+}
+
+static void q_ap_write(struct txn *t, u32 addr, u32 value) {
+	q_ap_select(t, addr);
+	t->m.op[t->m.pr0] = OP_WR | OP_AP | (addr & 0xC);
+	t->m.data[t->m.pr0] = value;
+	t->m.pr0++;
+}
+
+static void q_ap_read(struct txn *t, u32 addr, u32 *value) {
+	q_ap_select(t, addr);
+	t->m.op[t->m.pr0] = OP_RD | OP_AP | (addr & 0xC);
+	t->m.data[t->m.pr0] = 1;
+	t->m.pr0++;
+	q_result(t, value);
+	t->m.op[t->m.pr0] = OP_RD | DP_BUFFER;
+	t->m.data[t->m.pr0] = 1;
+	t->m.pr0++;
+}
+
+static void q_ahb_write(struct txn *t, u32 addr, u32 value) {
+	if (t->cache_ahbtar != addr) {
+		q_ap_write(t, AHB_TAR, addr);
+		t->cache_ahbtar = addr;
+	}
+	q_ap_write(t, AHB_DRW, value);
+}
+
+static void q_ahb_read(struct txn *t, u32 addr, u32 *value) {
+	if (t->cache_ahbtar != addr) {
+		q_ap_write(t, AHB_TAR, addr);
+		t->cache_ahbtar = addr;
+	}
+	q_ap_read(t, AHB_DRW, value);
+}
+
 int swdp_ap_write(u32 addr, u32 value) {
-	struct msg msg;
-	msg.op[0] = OP_WR | DP_SELECT;
-	msg.data[0] = addr & 0xF0;
-	msg.op[1] = OP_WR | OP_AP | (addr & 0xC);
-	msg.data[1] = value;
-	msg.pr0 = 2;
-	return invoke(&msg, MSG_SWDP_OPS);
+	struct txn t;
+	q_init(&t);
+	q_ap_write(&t, addr, value);
+	return q_exec(&t);
 }
 
 int swdp_ap_read(u32 addr, u32 *value) {
-	struct msg msg;
-	int r;
-	msg.op[0] = OP_WR | DP_SELECT;
-	msg.data[0] = addr & 0xF0;
-	msg.op[1] = OP_RD | OP_AP | (addr & 0xC);
-	msg.data[1] = 1;
-	msg.op[2] = OP_RD | DP_BUFFER;
-	msg.data[2] = 1;
-	msg.pr0 = 3;
-	r = invoke(&msg, MSG_SWDP_OPS);
-	*value = msg.data[2];
-	return r;
+	struct txn t;
+	q_init(&t);
+	q_ap_read(&t, addr, value);
+	return q_exec(&t);
 }
 
 int swdp_ahb_read(u32 addr, u32 *value) {
-	if (swdp_ap_write(AHB_TAR, addr))
-		return -1;
-	if (swdp_ap_read(AHB_DRW, value))
-		return -1;
-	return 0;
+	struct txn t;
+	q_init(&t);
+	q_ahb_read(&t, addr, value);
+	return q_exec(&t);
 }
 
 int swdp_ahb_write(u32 addr, u32 value) {
-	if (swdp_ap_write(AHB_TAR, addr))
-		return -1;
-	if (swdp_ap_write(AHB_DRW, value))
-		return -1;
-	return 0;
+	struct txn t;
+	q_init(&t);
+	q_ahb_write(&t, addr, value);
+	return q_exec(&t);
+}
+
+int swdp_ahb_read32(u32 addr, u32 *out, int count) {
+	struct txn t;
+	int r;
+
+again:
+	q_init(&t);
+	while (count-- > 0) {
+		q_ahb_read(&t, addr, out);
+		addr += 4;
+		out++;
+		if (t.m.pr0 > 9) {
+			if ((r = q_exec(&t)))
+				return r;
+			goto again;
+		}
+	}
+	return q_exec(&t);
 }
 
 int swdp_core_write(u32 n, u32 v) {
-	if (swdp_ahb_write(CDBG_REG_DATA, v))
-		return -1;
-	if (swdp_ahb_write(CDBG_REG_ADDR, (n & 0x1F) | 0x10000))
-		return -1;
-	return 0;
+	struct txn t;
+	q_init(&t);
+	q_ahb_write(&t, CDBG_REG_DATA, v);
+	q_ahb_write(&t, CDBG_REG_ADDR, (n & 0x1F) | 0x10000);
+	return q_exec(&t);
 }
 
 int swdp_core_read(u32 n, u32 *v) {
-	if (swdp_ahb_write(CDBG_REG_ADDR, n & 0x1F))
-		return -1;
-	return swdp_ahb_read(CDBG_REG_DATA, v);
+	struct txn t;
+	q_init(&t);
+	q_ahb_write(&t, CDBG_REG_ADDR, n & 0x1F);
+	q_ahb_read(&t, CDBG_REG_DATA, v);
+	return q_exec(&t);
 }
 
 int swdp_core_halt(void) {
