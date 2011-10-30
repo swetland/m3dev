@@ -24,6 +24,13 @@ STM32F1xx
   - PCLK2 = HCLK / 1
   - ADCCLK = PCLK2 / 2 (4MHz)
 
+LPC1343
+-------
+- how to trap just before the bootloader jumps to user flash
+  reset-stop
+  watch-rw 0
+  go
+
 gdb
 ---
 making the disassembler behave:

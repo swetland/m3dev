@@ -32,6 +32,11 @@ int swdp_core_read(u32 n, u32 *v);
 int swdp_core_read_all(u32 *v);
 int swdp_core_write(u32 n, u32 v);
 
+int swdp_watchpoint_pc(unsigned n, u32 addr);
+int swdp_watchpoint_rd(unsigned n, u32 addr);
+int swdp_watchpoint_wr(unsigned n, u32 addr);
+int swdp_watchpoint_rw(unsigned n, u32 addr);
+
 int swdp_reset(void);
 
 int swdp_open(void);

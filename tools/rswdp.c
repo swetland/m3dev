@@ -291,34 +291,62 @@ int swdp_core_read_all(u32 *v) {
 }
 
 int swdp_core_halt(void) {
-	u32 n;
-	if (swdp_ahb_read(CDBG_CSR, &n))
-		return -1;
-	if (swdp_ahb_write(CDBG_CSR, 
-		CDBG_CSR_KEY | CDBG_C_HALT | CDBG_C_DEBUGEN))
-		return -1;
-	return 0;
+	return swdp_ahb_write(CDBG_CSR, CDBG_CSR_KEY | CDBG_C_HALT | CDBG_C_DEBUGEN);
 }
 
 int swdp_core_step(void) {
-	u32 n;
-	if (swdp_ahb_read(CDBG_CSR, &n))
-		return -1;
-	if (swdp_ahb_write(CDBG_CSR, 
-		CDBG_CSR_KEY | CDBG_C_STEP | CDBG_C_DEBUGEN))
-		return -1;
-	return 0;
+	return swdp_ahb_write(CDBG_CSR, CDBG_CSR_KEY | CDBG_C_STEP | CDBG_C_DEBUGEN);
 }
 
 int swdp_core_resume(void) {
-	u32 n;
-	if (swdp_ahb_read(CDBG_CSR, &n))
-		return -1;
-	if (swdp_ahb_write(CDBG_CSR,
-		CDBG_CSR_KEY | (n & 0x3C)))
-		return -1;
-	return 0;
+	/* must leave DEBUGEN on to halt on vector catch, breakpoints, etc */
+	return swdp_ahb_write(CDBG_CSR, CDBG_CSR_KEY | CDBG_C_DEBUGEN);
 }
+
+#define DWT_COMP(n) (0xE0001020 + (n) * 0x10)
+#define DWT_MASK(n) (0xE0001024 + (n) * 0x10)
+#define DWT_FUNC(n) (0xE0001028 + (n) * 0x10)
+
+#define FUNC_DISABLED	0x0
+#define FUNC_WATCH_PC	0x4
+#define FUNC_WATCH_RD	0x5
+#define FUNC_WATCH_WR	0x6
+#define FUNC_WATCH_RW	0x7
+
+int swdp_watchpoint(unsigned n, u32 addr, u32 func) {
+	struct txn t;
+
+	if (n > 3)
+		return -1;
+
+	q_init(&t);
+	/* enable DWT, enable all exception traps */
+	q_ahb_write(&t, CDBG_EMCR, 0x010007F1);
+	q_ahb_write(&t, DWT_FUNC(n), FUNC_DISABLED);
+	if (func != FUNC_DISABLED) {
+		q_ahb_write(&t, DWT_COMP(n), addr);
+		q_ahb_write(&t, DWT_MASK(n), 0);
+		q_ahb_write(&t, DWT_FUNC(n), func);
+	}
+	return q_exec(&t);
+}
+
+int swdp_watchpoint_pc(unsigned n, u32 addr) {
+	return swdp_watchpoint(n, addr, FUNC_WATCH_PC);
+}
+
+int swdp_watchpoint_rd(unsigned n, u32 addr) {
+	return swdp_watchpoint(n, addr, FUNC_WATCH_RD);
+}
+
+int swdp_watchpoint_wr(unsigned n, u32 addr) {
+	return swdp_watchpoint(n, addr, FUNC_WATCH_WR);
+}
+
+int swdp_watchpoint_rw(unsigned n, u32 addr) {
+	return swdp_watchpoint(n, addr, FUNC_WATCH_RW);
+}
+
 
 int swdp_reset(void) {
 	struct txn t;

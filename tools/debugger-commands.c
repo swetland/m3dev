@@ -293,6 +293,18 @@ void do_reset_stop(int argc, param *argv) {
 	do_stop(0,0);
 }
 
+void do_watch_pc(int argc, param *argv) {
+	if (argc < 1)
+		return;
+	swdp_watchpoint_pc(0, argv[0].n);
+}
+
+void do_watch_rw(int argc, param *argv) {
+	if (argc < 1)
+		return;
+	swdp_watchpoint_rw(0, argv[0].n);
+}
+
 struct cmd CMD[] = {
 	{ "exit",	"", do_exit,	"" },
 	{ "attach",	"", do_attach,	"attach/reattach to sw-dp" },
@@ -307,6 +319,8 @@ struct cmd CMD[] = {
 	{ "download",	"", do_download,"download file to device" },
 	{ "reset",	"", do_reset,	"reset target" },
 	{ "reset-stop",	"", do_reset_stop, "reset target and halt cpu" },
+	{ "watch-pc",	"", do_watch_pc, "set watchpoint at addr" },
+	{ "watch-rw",	"", do_watch_rw, "set watchpoint at addr" },
 };
 
 void debugger_command(char *line) {
