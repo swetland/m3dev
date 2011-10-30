@@ -37,7 +37,10 @@ void xprintf(const char *fmt, ...) {
 void debugger_command(char *line);
 
 int main(int argc, char **argv) {
+	char lastline[1024];
 	char *line;
+
+	lastline[0] = 0;
 
 	if (swdp_open()) {
 		fprintf(stderr,"could not find device\n");
@@ -45,9 +48,12 @@ int main(int argc, char **argv) {
 	}
 //	swdp_enable_tracing(1);
 	while ((line = linenoise("debugger> ")) != NULL) {
-		if (line[0] == 0)
-			continue;
-		linenoiseHistoryAdd(line);
+		if (line[0] == 0) {
+			strcpy(line, lastline);
+		} else {
+			linenoiseHistoryAdd(line);
+			strcpy(lastline, line);
+		}
 		debugger_command(line);
 	}
 	return 0;
