@@ -353,7 +353,7 @@ void swdp_enable_tracing(int yes) {
 void swdp_target_reset(int enable) {
 	struct txn t;
 	q_init(&t);
-	t.tx[t.txc++] = RSWD_MSG(CMD_RESET, enable, 0);
+	t.tx[t.txc++] = RSWD_MSG(CMD_RESET, 0, enable);
 	q_exec(&t);
 }
 
