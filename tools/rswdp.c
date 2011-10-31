@@ -404,6 +404,6 @@ int swdp_open(void) {
 	}
 
 	swdp_enable_tracing(0);
-
-	return swdp_reset();
+	swdp_reset();
+	return 0;
 }
