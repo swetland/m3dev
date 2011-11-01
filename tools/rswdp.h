@@ -21,7 +21,9 @@
 int swdp_ahb_read(u32 addr, u32 *value);
 int swdp_ahb_write(u32 addr, u32 value);
 
+/* bulk reads/writes (more efficient after ~3-4 words */
 int swdp_ahb_read32(u32 addr, u32 *out, int count);
+int swdp_ahb_write32(u32 addr, u32 *out, int count);
 
 int swdp_core_halt(void);
 int swdp_core_step(void);

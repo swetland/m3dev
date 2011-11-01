@@ -20,6 +20,7 @@
 #include <unistd.h>
 #include <string.h>
 #include <fcntl.h>
+#include <sys/time.h>
 
 /* TODO
  * - fault recovery (try dw 10000000 for example)
@@ -28,6 +29,12 @@
 #include <fw/types.h>
 #include <protocol/rswdp.h>
 #include "rswdp.h"
+
+long long now() {
+	struct timeval tv;
+	gettimeofday(&tv, 0);
+	return ((long long) tv.tv_usec) + ((long long) tv.tv_sec) * 1000000LL;
+}
 
 #define printf __use_xprintf_in_debugger_commands_c__
 
@@ -260,8 +267,10 @@ void do_db(int argc, param *argv) {
 void do_download(int argc, param *argv) {
 	u32 addr;
 	u8 data[32768];
-	u32 *w;
+	u8 vrfy[32768];
 	int fd, r;
+
+	long long t0, t1;
 
 	if (argc != 2) {
 		xprintf("error: usage: download <file> <addr>\n");
@@ -275,31 +284,32 @@ void do_download(int argc, param *argv) {
 		return;
 	}
 	r = (r + 3) & ~3;
+	addr = argv[1].n;
 
 	xprintf("sending %d bytes...\n", r);
-	w = (void*) data;
-	addr = argv[1].n;
-	while (r > 0) {
-		if (swdp_ahb_write(addr, *w)) {
-			xprintf("error: failed to write @ %08x\n", addr);
-			return;
-		}
+	t0 = now();
+	if (swdp_ahb_write32(addr, (void*) data, r / 4)) {
+		xprintf("error: failed to write data\n");
+		return;
+	}
+	t1 = now();
+	xprintf("%lld uS -> %lld B/s\n", (t1 - t0), 
+		(((long long)r) * 1000000LL) / (t1 - t0));
+
 #if 0
-		u32 tmp = 0xeeeeeeee;
-		if (swdp_ahb_read(addr, &tmp)) {
-			xprintf("oops\n");
-			return;
-		}
-		if (tmp != *w) {
-			xprintf("ACK %08x %08x @ %08x\n", tmp, *w, addr);
-			return;
-		}
+	t0 = now();
+	if (swdp_ahb_read32(addr, (void*) vrfy, r / 4)) {
+		xprintf("error: verify read failed\n");
+		return;
+	}
+	t1 = now();
+	xprintf("%lld uS. %lld B/s.\n", (t1 - t0), 
+		(((long long)r) * 1000000LL) / (t1 - t0));
+	if (memcmp(data,vrfy,r)) {
+		xprintf("error: verify failed\n");
+		return;
+	}
 #endif
-		r++;
-		w++;
-		addr += 4;
-		r -= 4;
-	} 
 }
 
 void do_reset(int argc, param *argv) {

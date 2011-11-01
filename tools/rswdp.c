@@ -247,6 +247,8 @@ int swdp_ahb_write(u32 addr, u32 value) {
 	return q_exec(&t);
 }
 
+#if 0
+/* simpler but far less optimal. keeping against needing to debug */
 int swdp_ahb_read32(u32 addr, u32 *out, int count) {
 	struct txn t;
 	while (count > 0) {
@@ -262,6 +264,120 @@ int swdp_ahb_read32(u32 addr, u32 *out, int count) {
 	}
 	return 0;
 }
+
+int swdp_ahb_write32(u32 addr, u32 *in, int count) {
+	struct txn t;
+	while (count > 0) {
+		int xfer = (count > 128) ? 128: count;
+		count -= xfer;
+		q_init(&t);
+		while (xfer-- > 0) {
+			q_ahb_write(&t, addr, *in++);
+			addr += 4;
+		}
+		if (q_exec(&t))
+			return -1;
+	}
+	return 0;
+}
+#else
+/* 10 txns overhead per 128 read txns - 126KB/s on 72MHz STM32F
+ * 8 txns overhead per 128 write txns - 99KB/s on 72MHz STM32F
+ */
+int swdp_ahb_read32(u32 addr, u32 *out, int count) {
+	struct txn t;
+
+	while (count > 0) {
+		int xfer;
+
+		/* auto-inc wraps at page boundaries... */
+		if ((addr & 0xFFF) > 0xE00) {
+			xfer = (0x1000 - (addr & 0xFFF)) / 4;
+			if (xfer > count)
+				xfer = count;
+		} else {
+			xfer = (count > 128) ? 128: count;
+		}
+
+		count -= xfer;
+		q_init(&t);
+
+		/* setup before initial txn */
+		q_ap_write(&t, AHB_CSW,
+			AHB_CSW_MDEBUG | AHB_CSW_PRIV | AHB_CSW_INC_SINGLE |
+			AHB_CSW_DBG_EN | AHB_CSW_32BIT);
+
+		/* initial address */
+		q_ap_write(&t, AHB_TAR, addr);
+		addr += xfer * 4;
+
+		/* kick off first read, ignore result, as the
+		 * real result will show up during the *next* read
+		 */
+		t.tx[t.txc++] = SWD_RX(OP_AP | (AHB_DRW & 0xC), 1);
+		while (xfer-- > 1) {
+			t.tx[t.txc++] = SWD_RD(OP_AP | (AHB_DRW & 0xC), 1);
+			t.rx[t.rxc++] = out++;
+		}
+		t.tx[t.txc++] = SWD_RD(DP_BUFFER, 1);
+		t.rx[t.rxc++] = out++;
+
+		/* restore state after last batch */
+		if (count == 0)
+			q_ap_write(&t, AHB_CSW,
+				AHB_CSW_MDEBUG | AHB_CSW_PRIV |
+				AHB_CSW_DBG_EN | AHB_CSW_32BIT);
+
+		if (q_exec(&t))
+			return -1;
+	}
+	return 0;
+}
+
+int swdp_ahb_write32(u32 addr, u32 *in, int count) {
+	struct txn t;
+
+	while (count > 0) {
+		int xfer;
+
+		/* auto-inc wraps at page boundaries... */
+		if ((addr & 0xFFF) > 0xE00) {
+			xfer = (0x1000 - (addr & 0xFFF)) / 4;
+			if (xfer > count)
+				xfer = count;
+		} else {
+			xfer = (count > 128) ? 128: count;
+		}
+
+		count -= xfer;
+		q_init(&t);
+
+		/* setup before initial txn */
+		q_ap_write(&t, AHB_CSW,
+			AHB_CSW_MDEBUG | AHB_CSW_PRIV | AHB_CSW_INC_SINGLE |
+			AHB_CSW_DBG_EN | AHB_CSW_32BIT);
+
+		/* initial address */
+		q_ap_write(&t, AHB_TAR, addr);
+		addr += xfer * 4;
+
+		while (xfer-- > 0) {
+			t.tx[t.txc++] = SWD_WR(OP_AP | (AHB_DRW & 0xC), 1);
+			t.tx[t.txc++] = *in++;
+		}
+
+		/* restore state after last batch */
+		if (count == 0)
+			q_ap_write(&t, AHB_CSW,
+				AHB_CSW_MDEBUG | AHB_CSW_PRIV |
+				AHB_CSW_DBG_EN | AHB_CSW_32BIT);
+
+		if (q_exec(&t))
+			return -1;
+	}
+	return 0;
+}
+#endif
 
 int swdp_core_write(u32 n, u32 v) {
 	struct txn t;

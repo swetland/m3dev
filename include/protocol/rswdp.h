@@ -91,14 +91,17 @@
 #define AHB_ROM_ADDR	0xF8
 #define AHB_IDR		0xFC
 
-#define AHB_CSW_MCORE	(0 << 29)
-#define AHB_CSW_MDEBUG	(1 << 29)
-#define AHB_CSW_USER	(0 << 25)
-#define AHB_CSW_PRIV	(1 << 25)
-#define AHB_CSW_DBG_EN	(1 << 6)
-#define AHB_CSW_8BIT	(0 << 0)
-#define AHB_CSW_16BIT	(1 << 0)
-#define AHB_CSW_32BIT	(2 << 0)
+#define AHB_CSW_MCORE		(0 << 29)
+#define AHB_CSW_MDEBUG		(1 << 29)
+#define AHB_CSW_USER		(0 << 25)
+#define AHB_CSW_PRIV		(1 << 25)
+#define AHB_CSW_DBG_EN		(1 << 6)
+#define AHB_CSW_INC_NONE	(0 << 4)
+#define AHB_CSW_INC_SINGLE	(1 << 4)
+#define AHB_CSWINC_PACKED	(2 << 4)
+#define AHB_CSW_8BIT		(0 << 0)
+#define AHB_CSW_16BIT		(1 << 0)
+#define AHB_CSW_32BIT		(2 << 0)
 
 /* Core Debug registers */
 #define CDBG_CSR		0xE000EDF0
