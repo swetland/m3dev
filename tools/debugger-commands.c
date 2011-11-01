@@ -33,9 +33,8 @@
 
 extern void xprintf(const char *fmt, ...);
 
-extern int (*disassemble_thumb2)(
-	u32 addr, u16 op0, u16 op1, char *text, int len)
-	__attribute__ ((weak));
+extern int disassemble_thumb2(u32 addr, u16 op0, u16 op1,
+		char *text, int len) __attribute__ ((weak));
 
 int disassemble(u32 addr) {
 	char text[128];
