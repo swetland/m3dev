@@ -33,6 +33,35 @@
 
 extern void xprintf(const char *fmt, ...);
 
+extern int (*disassemble_thumb2)(
+	u32 addr, u16 op0, u16 op1, char *text, int len)
+	__attribute__ ((weak));
+
+int disassemble(u32 addr) {
+	char text[128];
+	int r;
+	union {
+		u32 w[2];
+		u16 h[4];
+	} mem;
+
+	if (!disassemble_thumb2)
+		return -1;
+
+	if (addr & 2) {
+		if (swdp_ahb_read32(addr & (~3), mem.w, 2))
+			return -1;
+		r = disassemble_thumb2(addr, mem.h[1], mem.h[2], text, 128);
+	} else {
+		if (swdp_ahb_read32(addr & (~3), mem.w, 1))
+			return -1;
+		r = disassemble_thumb2(addr, mem.h[0], mem.h[1], text, 128);
+	}
+	if (r > 0)
+		xprintf("%s\n", text);
+	return r;
+}
+
 typedef struct {
 	const char *s;
 	unsigned n;
@@ -70,6 +99,7 @@ void do_regs(int argc, param *argv) {
 	xprintf("r3 %08x r7 %08x 11 %08x pc %08x\n",
 		lastregs[3], lastregs[7], lastregs[11],
 		lastregs[15]);
+	disassemble(lastregs[15]);
 }
 
 void do_stop(int argc, param *argv) {
