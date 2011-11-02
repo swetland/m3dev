@@ -137,6 +137,12 @@ static int q_exec(struct txn *t) {
 	}
 	t->magic = 0;
 
+	/* If we are a multiple of 64, and not exactly 4K,
+	 * add padding to ensure the target can detect the end of txn 
+	 */
+	if (((t->txc % 16) == 0) && (t->txc != 1024))
+		t->tx[t->txc++] = RSWD_MSG(CMD_NULL, 0, 0);
+
 	id = RSWD_TXN_START(seq);
 	t->tx[0] = id;
 
@@ -146,7 +152,7 @@ static int q_exec(struct txn *t) {
 		return -1;
 	}
 	for (;;) {
-		r = usb_read(usb, data, sizeof(data));
+		r = usb_read(usb, data, 4096);
 		if (r <= 0) {
 			fprintf(stderr,"invoke: rx error\n");
 			return -1;
