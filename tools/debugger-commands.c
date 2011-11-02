@@ -30,6 +30,8 @@
 #include <protocol/rswdp.h>
 #include "rswdp.h"
 
+void debugger_command(char *line);
+
 long long now() {
 	struct timeval tv;
 	gettimeofday(&tv, 0);
@@ -348,6 +350,30 @@ void do_watch_rw(int argc, param *argv) {
 	swdp_watchpoint_rw(0, argv[0].n);
 }
 
+void do_script(int argc, param *argv) {
+	FILE *fp;
+	char line[256];
+
+	if (argc != 1)
+		return;
+
+	if (!(fp = fopen(argv[0].s, "r")))
+		return;
+
+	while (fgets(line, sizeof(line), fp)) {
+		if (line[0] == '#')
+			continue;
+		xprintf("script> %s", line);
+		debugger_command(line);
+	}
+	fclose(fp);
+}
+
+void do_print(int argc, param *argv) {
+	while (argc-- > 0)
+		xprintf("%08x ", argv++[0].n);
+	xprintf("\n");
+}
 struct cmd CMD[] = {
 	{ "exit",	"", do_exit,	"" },
 	{ "attach",	"", do_attach,	"attach/reattach to sw-dp" },
@@ -364,6 +390,8 @@ struct cmd CMD[] = {
 	{ "reset-stop",	"", do_reset_stop, "reset target and halt cpu" },
 	{ "watch-pc",	"", do_watch_pc, "set watchpoint at addr" },
 	{ "watch-rw",	"", do_watch_rw, "set watchpoint at addr" },
+	{ "script",	"", do_script,	"run commands from a script" },
+	{ "print",	"", do_print,	"print numeric arguments" },
 };
 
 void debugger_command(char *line) {
@@ -392,8 +420,13 @@ void debugger_command(char *line) {
 	if (n == 0)
 		return;
 
-	for (c = 0; c < n; c++)
-		arg[c].n = strtoul(arg[c].s, 0, 16);
+	for (c = 0; c < n; c++) {
+		if (arg[c].s[0] == '.') {
+			arg[c].n = strtoul(arg[c].s + 1, 0, 10);
+		} else {
+			arg[c].n = strtoul(arg[c].s, 0, 16);
+		}
+	}
 
 	for (c = 0; c < (sizeof(CMD) / sizeof(CMD)[0]); c++) {
 		if (!strcasecmp(arg[0].s, CMD[c].name)) {
