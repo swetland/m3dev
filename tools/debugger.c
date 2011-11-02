@@ -20,6 +20,7 @@
 #include <stdarg.h>
 #include <unistd.h>
 #include <string.h>
+#include <signal.h>
 #include <fcntl.h>
 
 #include "linenoise.h"
@@ -36,6 +37,10 @@ void xprintf(const char *fmt, ...) {
 
 void debugger_command(char *line);
 
+static void handler(int n) {
+	swdp_interrupt();
+}
+
 int main(int argc, char **argv) {
 	char lastline[1024];
 	char *line;
@@ -46,6 +51,9 @@ int main(int argc, char **argv) {
 		fprintf(stderr,"could not find device\n");
 		return -1;
 	}
+
+	signal(SIGINT, handler);
+
 //	swdp_enable_tracing(1);
 	while ((line = linenoise("debugger> ")) != NULL) {
 		if (line[0] == 0) {

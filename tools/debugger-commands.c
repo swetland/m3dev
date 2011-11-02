@@ -115,6 +115,8 @@ void do_stop(int argc, param *argv) {
 
 void do_resume(int argc, param *argv) {
 	swdp_core_resume();
+	if (swdp_core_wait_for_halt() == 0)
+		do_regs(0, 0);
 }
 
 void do_step(int argc, param *argv) {
@@ -122,6 +124,7 @@ void do_step(int argc, param *argv) {
 		u32 pc;
 		do {
 			swdp_core_step();
+			swdp_core_wait_for_halt();
 			if (swdp_core_read(15, &pc)) {
 				xprintf("error\n");
 				return;
@@ -132,6 +135,7 @@ void do_step(int argc, param *argv) {
 		xprintf("\n");
 	} else {
 		swdp_core_step();
+		swdp_core_wait_for_halt();
 	}
 	do_regs(0, 0);
 }
@@ -296,7 +300,7 @@ void do_download(int argc, param *argv) {
 	xprintf("%lld uS -> %lld B/s\n", (t1 - t0), 
 		(((long long)r) * 1000000LL) / (t1 - t0));
 
-#if 0
+#if 1
 	t0 = now();
 	if (swdp_ahb_read32(addr, (void*) vrfy, r / 4)) {
 		xprintf("error: verify read failed\n");

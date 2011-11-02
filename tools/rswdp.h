@@ -29,6 +29,10 @@ int swdp_core_halt(void);
 int swdp_core_step(void);
 int swdp_core_resume(void);
 
+/* return 0 when CPU halts, -1 if an error occurs, or -2 if interrupted */
+int swdp_core_wait_for_halt(void);
+void swdp_interrupt(void);
+
 /* access to CPU registers */
 int swdp_core_read(u32 n, u32 *v);
 int swdp_core_read_all(u32 *v);

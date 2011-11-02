@@ -26,6 +26,13 @@
 #include <protocol/rswdp.h>
 #include "rswdp.h"
 
+static volatile int ATTN;
+
+void swdp_interrupt(void) {
+	ATTN++;
+	write(2, "\b\b*INTERRUPT*\n", 16);
+}
+
 static int match_18d1_6502(usb_ifc_info *ifc) {
 	if (ifc->dev_vendor != 0x18d1)
 		return -1;
@@ -410,6 +417,19 @@ int swdp_core_halt(void) {
 
 int swdp_core_step(void) {
 	return swdp_ahb_write(CDBG_CSR, CDBG_CSR_KEY | CDBG_C_STEP | CDBG_C_DEBUGEN);
+}
+
+int swdp_core_wait_for_halt(void) {
+	int last = ATTN;
+	u32 csr;
+	for (;;) {
+		if (swdp_ahb_read(CDBG_CSR, &csr))
+			return -1;
+		if (csr & CDBG_S_HALT)
+			return 0;
+		if (ATTN != last)
+			return -2;
+	}
 }
 
 int swdp_core_resume(void) {
