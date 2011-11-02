@@ -291,12 +291,12 @@ int swdp_ahb_read32(u32 addr, u32 *out, int count) {
 		int xfer;
 
 		/* auto-inc wraps at page boundaries... */
-		if ((addr & 0xFFF) > 0xE00) {
+		if ((addr & 0xFFF) > 0x800) {
 			xfer = (0x1000 - (addr & 0xFFF)) / 4;
 			if (xfer > count)
 				xfer = count;
 		} else {
-			xfer = (count > 128) ? 128: count;
+			xfer = (count > 512) ? 512 : count;
 		}
 
 		count -= xfer;
@@ -315,10 +315,9 @@ int swdp_ahb_read32(u32 addr, u32 *out, int count) {
 		 * real result will show up during the *next* read
 		 */
 		t.tx[t.txc++] = SWD_RX(OP_AP | (AHB_DRW & 0xC), 1);
-		while (xfer-- > 1) {
-			t.tx[t.txc++] = SWD_RD(OP_AP | (AHB_DRW & 0xC), 1);
+		t.tx[t.txc++] = SWD_RD(OP_AP | (AHB_DRW & 0xC), xfer -1);
+		while (xfer-- > 1)
 			t.rx[t.rxc++] = out++;
-		}
 		t.tx[t.txc++] = SWD_RD(DP_BUFFER, 1);
 		t.rx[t.rxc++] = out++;
 
@@ -341,12 +340,12 @@ int swdp_ahb_write32(u32 addr, u32 *in, int count) {
 		int xfer;
 
 		/* auto-inc wraps at page boundaries... */
-		if ((addr & 0xFFF) > 0xE00) {
+		if ((addr & 0xFFF) > 0x800) {
 			xfer = (0x1000 - (addr & 0xFFF)) / 4;
 			if (xfer > count)
 				xfer = count;
 		} else {
-			xfer = (count > 128) ? 128: count;
+			xfer = (count > 512) ? 512 : count;
 		}
 
 		count -= xfer;
@@ -359,12 +358,11 @@ int swdp_ahb_write32(u32 addr, u32 *in, int count) {
 
 		/* initial address */
 		q_ap_write(&t, AHB_TAR, addr);
-		addr += xfer * 4;
 
-		while (xfer-- > 0) {
-			t.tx[t.txc++] = SWD_WR(OP_AP | (AHB_DRW & 0xC), 1);
+		t.tx[t.txc++] = SWD_WR(OP_AP | (AHB_DRW & 0xC), xfer);
+		addr += xfer * 4;
+		while (xfer-- > 0) 
 			t.tx[t.txc++] = *in++;
-		}
 
 		/* restore state after last batch */
 		if (count == 0)
