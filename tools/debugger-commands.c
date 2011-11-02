@@ -167,6 +167,18 @@ struct {
 	{ "psp", 18 },
 };
 
+static int get_register(const char *name, u32 *value) {
+	int n;
+	for (n = 0; n < (sizeof(core_regmap) / sizeof(core_regmap[0])); n++) {
+		if (!strcasecmp(name, core_regmap[n].name)) {
+			if (swdp_core_read(core_regmap[n].n, value))
+				return -1;
+			return 0;
+		}
+	}
+	return -2;
+}
+
 void do_dr(int argc, param *argv) {
 	unsigned n;
 	u32 x = 0xeeeeeeee;
@@ -302,7 +314,7 @@ void do_download(int argc, param *argv) {
 	xprintf("%lld uS -> %lld B/s\n", (t1 - t0), 
 		(((long long)r) * 1000000LL) / (t1 - t0));
 
-#if 1
+#if 0
 	t0 = now();
 	if (swdp_ahb_read32(addr, (void*) vrfy, r / 4)) {
 		xprintf("error: verify read failed\n");
@@ -394,6 +406,46 @@ struct cmd CMD[] = {
 	{ "print",	"", do_print,	"print numeric arguments" },
 };
 
+int parse_number(const char *in, unsigned *out) {
+	u32 value;
+	char text[64];
+	char *obrack;
+
+	strncpy(text, in, sizeof(text));
+	text[sizeof(text)-1] = 0;
+
+	obrack = strchr(text, '[');
+	if (obrack) {
+		unsigned base, index;
+		char *cbrack;
+		*obrack++ = 0;
+		cbrack = strchr(obrack, ']');
+		if (!cbrack)
+			return -1;
+		*cbrack = 0;
+		if (parse_number(text, &base))
+			return -1;
+		if (parse_number(obrack, &index))
+			return -1;
+		if (swdp_ahb_read(base + index, &value))
+			return -1;
+		*out = value;
+		return 0;	
+	} else {
+		int r = get_register(text, &value);
+		if (r != -2) {
+			*out = value;
+			return r;
+		}
+		if (text[0] == '.') {
+			*out = strtoul(text + 1, 0, 10);
+		} else {
+			*out = strtoul(text, 0, 16);
+		}
+		return 0;
+	}
+}
+
 void debugger_command(char *line) {
 	param arg[32];
 	unsigned c, n = 0;
@@ -421,10 +473,9 @@ void debugger_command(char *line) {
 		return;
 
 	for (c = 0; c < n; c++) {
-		if (arg[c].s[0] == '.') {
-			arg[c].n = strtoul(arg[c].s + 1, 0, 10);
-		} else {
-			arg[c].n = strtoul(arg[c].s, 0, 16);
+		if (parse_number(arg[c].s, &(arg[c].n))) {
+			xprintf("error: bad number: %s\n", arg[c].s);
+			return;
 		}
 	}
 
