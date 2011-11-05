@@ -19,6 +19,7 @@
 #include <stdlib.h>
 #include <unistd.h>
 #include <string.h>
+#include <ctype.h>
 #include <fcntl.h>
 #include <sys/time.h>
 
@@ -30,7 +31,18 @@
 #include <protocol/rswdp.h>
 #include "rswdp.h"
 
-void debugger_command(char *line);
+struct funcline {
+	struct funcline *next;
+	char text[0];
+};
+
+struct funcinfo {
+	struct funcinfo *next;
+	struct funcline *lines;
+	char name[0];
+};
+
+int debugger_command(char *line);
 
 long long now() {
 	struct timeval tv;
@@ -78,22 +90,24 @@ typedef struct {
 struct cmd {
 	const char *name;
 	const char *args;
-	void (*func)(int argc, param *argv);
+	int (*func)(int argc, param *argv);
 	const char *help;
 };
 
-void do_exit(int argc, param *argv) {
+int do_exit(int argc, param *argv) {
 	exit(0);
+	return 0;
 }
 
-void do_attach(int argc, param *argv) {
-	swdp_reset();
+int do_attach(int argc, param *argv) {
+	return swdp_reset();
 }
 
 static u32 lastregs[19];
 
-void do_regs(int argc, param *argv) {
-	swdp_core_read_all(lastregs);
+int do_regs(int argc, param *argv) {
+	if (swdp_core_read_all(lastregs))
+		return -1;
 
 	xprintf("r0 %08x r4 %08x r8 %08x ip %08x psr %08x\n",
 		lastregs[0], lastregs[4], lastregs[8],
@@ -108,20 +122,23 @@ void do_regs(int argc, param *argv) {
 		lastregs[3], lastregs[7], lastregs[11],
 		lastregs[15]);
 	disassemble(lastregs[15]);
+	return 0;
 }
 
-void do_stop(int argc, param *argv) {
+int do_stop(int argc, param *argv) {
 	swdp_core_halt();
 	do_regs(0, 0);
+	return 0;
 }
 
-void do_resume(int argc, param *argv) {
+int do_resume(int argc, param *argv) {
 	swdp_core_resume();
 	if (swdp_core_wait_for_halt() == 0)
 		do_regs(0, 0);
+	return 0;
 }
 
-void do_step(int argc, param *argv) {
+int do_step(int argc, param *argv) {
 	if (argc > 0) {
 		u32 pc;
 		do {
@@ -129,7 +146,7 @@ void do_step(int argc, param *argv) {
 			swdp_core_wait_for_halt();
 			if (swdp_core_read(15, &pc)) {
 				xprintf("error\n");
-				return;
+				return -1;
 			}
 			xprintf(".");
 			fflush(stdout);
@@ -140,6 +157,7 @@ void do_step(int argc, param *argv) {
 		swdp_core_wait_for_halt();
 	}
 	do_regs(0, 0);
+	return 0;
 }
 
 struct {
@@ -179,41 +197,43 @@ static int get_register(const char *name, u32 *value) {
 	return -2;
 }
 
-void do_dr(int argc, param *argv) {
+int do_dr(int argc, param *argv) {
 	unsigned n;
 	u32 x = 0xeeeeeeee;
 	if (argc < 1)
-		return;
+		return -1;
 	for (n = 0; n < (sizeof(core_regmap) / sizeof(core_regmap[0])); n++) {
 		if (!strcasecmp(argv[0].s, core_regmap[n].name)) {
 			swdp_core_read(core_regmap[n].n, &x);
 			xprintf("%s: %08x\n", argv[0].s, x);
-			return;
+			return 0;
 		}
 	}
 	swdp_ahb_read(argv[0].n, &x);
 	xprintf("%08x: %08x\n", argv[0].n, x);
+	return 0;
 }
 
-void do_wr(int argc, param *argv) {
+int do_wr(int argc, param *argv) {
 	unsigned n;
 	if (argc < 2)
-		return;
+		return -1;
 	for (n = 0; n < (sizeof(core_regmap) / sizeof(core_regmap[0])); n++) {
 		if (!strcasecmp(argv[0].s, core_regmap[n].name)) {
 			swdp_core_write(core_regmap[n].n, argv[1].n);
 			xprintf("%s<<%08x\n", argv[0].s, argv[1].n);
-			return;
+			return 0;
 		}
 	}
 	swdp_ahb_write(argv[0].n, argv[1].n);
 	xprintf("%08x<<%08x\n", argv[0].n, argv[1].n);
+	return 0;
 }
 
 static u32 lastaddr = 0x20000000;
 static u32 lastcount = 0x40;
 
-void do_dw(int argc, param *argv) {
+int do_dw(int argc, param *argv) {
 	u32 data[4096];
 	u32 addr = lastaddr;
 	u32 count = lastcount;
@@ -234,22 +254,25 @@ void do_dw(int argc, param *argv) {
 	lastcount = count;
 
 	count /= 4;
-	swdp_ahb_read32(addr, data, count);
+	if (swdp_ahb_read32(addr, data, count))
+		return -1;
 	for (n = 0; n < count; n++) {
 		if ((n & 3) == 0)
 			xprintf("\n%08x:", addr + (n << 2));
 		xprintf(" %08x", data[n]);
 	}
 	xprintf("\n");
+	return 0;
 }
 
 
-void do_db(int argc, param *argv) {
+int do_db(int argc, param *argv) {
 	u32 addr, count;
 	u8 data[1024];
 	unsigned n;
+
 	if (argc < 2)
-		return;
+		return -1;
 
 	addr = argv[0].n;
 	count = argv[1].n;
@@ -258,7 +281,6 @@ void do_db(int argc, param *argv) {
 		count = 1024;
 
 	memset(data, 0xee, 1024);
-
 
 	swdp_ahb_write(AHB_CSW, AHB_CSW_MDEBUG | AHB_CSW_PRIV |
 		AHB_CSW_DBG_EN | AHB_CSW_8BIT);
@@ -280,9 +302,10 @@ void do_db(int argc, param *argv) {
 		xprintf(" %02x", data[n]);
 	}
 	xprintf("\n");
+	return 0;
 }
 
-void do_download(int argc, param *argv) {
+int do_download(int argc, param *argv) {
 	u32 addr;
 	u8 data[32768];
 	u8 vrfy[32768];
@@ -292,14 +315,14 @@ void do_download(int argc, param *argv) {
 
 	if (argc != 2) {
 		xprintf("error: usage: download <file> <addr>\n");
-		return;
+		return -1;
 	}
 
 	fd = open(argv[0].s, O_RDONLY);
 	r = read(fd, data, sizeof(data));
 	if ((fd < 0) || (r < 0)) {
 		xprintf("error: cannot read '%s'\n", argv[0].s);
-		return;
+		return -1;
 	}
 	r = (r + 3) & ~3;
 	addr = argv[1].n;
@@ -308,7 +331,7 @@ void do_download(int argc, param *argv) {
 	t0 = now();
 	if (swdp_ahb_write32(addr, (void*) data, r / 4)) {
 		xprintf("error: failed to write data\n");
-		return;
+		return -1;
 	}
 	t1 = now();
 	xprintf("%lld uS -> %lld B/s\n", (t1 - t0), 
@@ -318,19 +341,20 @@ void do_download(int argc, param *argv) {
 	t0 = now();
 	if (swdp_ahb_read32(addr, (void*) vrfy, r / 4)) {
 		xprintf("error: verify read failed\n");
-		return;
+		return -1;
 	}
 	t1 = now();
 	xprintf("%lld uS. %lld B/s.\n", (t1 - t0), 
 		(((long long)r) * 1000000LL) / (t1 - t0));
 	if (memcmp(data,vrfy,r)) {
 		xprintf("error: verify failed\n");
-		return;
+		return -1;
 	}
 #endif
+	return 0;
 }
 
-void do_reset(int argc, param *argv) {
+int do_reset(int argc, param *argv) {
 	if (argc > 0) {
 		swdp_target_reset(argv[0].n);
 	} else {
@@ -338,9 +362,10 @@ void do_reset(int argc, param *argv) {
 		usleep(10000);
 		swdp_target_reset(0);
 	}
+	return 0;
 }
 
-void do_reset_stop(int argc, param *argv) {
+int do_reset_stop(int argc, param *argv) {
 	swdp_core_halt();
 	swdp_ahb_write(CDBG_EMCR, 1);
 	swdp_target_reset(1);
@@ -348,44 +373,111 @@ void do_reset_stop(int argc, param *argv) {
 	swdp_target_reset(0);
 	usleep(10000);
 	do_stop(0,0);
+	return 0;
 }
 
-void do_watch_pc(int argc, param *argv) {
+int do_watch_pc(int argc, param *argv) {
 	if (argc < 1)
-		return;
-	swdp_watchpoint_pc(0, argv[0].n);
+		return -1;
+	return swdp_watchpoint_pc(0, argv[0].n);
 }
 
-void do_watch_rw(int argc, param *argv) {
+int do_watch_rw(int argc, param *argv) {
 	if (argc < 1)
-		return;
-	swdp_watchpoint_rw(0, argv[0].n);
+		return -1;
+	return swdp_watchpoint_rw(0, argv[0].n);
 }
 
-void do_script(int argc, param *argv) {
+static struct funcinfo *allfuncs = 0;
+static struct funcinfo *newfunc = 0;
+static struct funcline *lastline = 0;
+
+int do_end(int argc, param *argv) {
+	if (argc)
+		return -1;
+	if (newfunc == 0) {
+		xprintf("error: nothing to end\n");
+		return -1;
+	}
+	newfunc->next = allfuncs;
+	allfuncs = newfunc;
+	newfunc = 0;
+	return 0;
+}
+
+int do_function(int argc, param *argv) {
+	if (argc != 1)
+		return -1;
+	if (newfunc) {
+		xprintf("error: nested funcdefs not allowed\n");
+		return -1;
+	}
+	newfunc = malloc(sizeof(*newfunc) + strlen(argv[0].s) + 1);
+	if (newfunc == 0) {
+		xprintf("error: out of memory\n");
+		return -1;
+	}
+	strcpy(newfunc->name, argv[0].s);
+	newfunc->next = 0;
+	newfunc->lines = 0;
+	return 0;
+}
+
+int do_script(int argc, param *argv) {
 	FILE *fp;
 	char line[256];
 
 	if (argc != 1)
-		return;
+		return -1;
 
-	if (!(fp = fopen(argv[0].s, "r")))
-		return;
+	if (!(fp = fopen(argv[0].s, "r"))) {
+		xprintf("error: cannot open '%s'\n", argv[0].s);
+		return -1;
+	}
 
 	while (fgets(line, sizeof(line), fp)) {
 		if (line[0] == '#')
 			continue;
-		xprintf("script> %s", line);
-		debugger_command(line);
+		if (newfunc) {
+			struct funcline *fl;
+			if (!strncmp(line, "end", 3) && isspace(line[3]))
+				goto enddef;
+			fl = malloc(sizeof(*fl) + strlen(line) + 1);
+			if (fl == 0) {
+				xprintf("out of memory");
+				newfunc = 0;
+				fclose(fp);
+				return -1;
+			}
+			strcpy(fl->text, line);
+			fl->next = 0;
+			if (lastline) {
+				lastline->next = fl;
+			} else {
+				newfunc->lines = fl;
+			}
+			lastline = fl;
+		} else {
+			xprintf("script> %s", line);
+enddef:
+			if (debugger_command(line))
+				return -1;
+		}
 	}
 	fclose(fp);
+
+	if (newfunc)
+		newfunc = 0;
+	return 0;
 }
 
-void do_print(int argc, param *argv) {
+int do_print(int argc, param *argv) {
 	while (argc-- > 0)
 		xprintf("%08x ", argv++[0].n);
 	xprintf("\n");
+	return 0;
 }
+
 struct cmd CMD[] = {
 	{ "exit",	"", do_exit,	"" },
 	{ "attach",	"", do_attach,	"attach/reattach to sw-dp" },
@@ -404,6 +496,9 @@ struct cmd CMD[] = {
 	{ "watch-rw",	"", do_watch_rw, "set watchpoint at addr" },
 	{ "script",	"", do_script,	"run commands from a script" },
 	{ "print",	"", do_print,	"print numeric arguments" },
+
+	{ "function",	"", do_function, "define a function" },
+	{ "end", 	"", do_end, "end definition" },
 };
 
 int parse_number(const char *in, unsigned *out) {
@@ -446,9 +541,27 @@ int parse_number(const char *in, unsigned *out) {
 	}
 }
 
-void debugger_command(char *line) {
+int exec_function(struct funcinfo *f, int argc, param *argv) {
+	struct funcline *line;
+	char text[256];
+	int n;
+
+	for (line = f->lines, n = 1; line; line = line->next, n++) {
+		int r;
+		strcpy(text, line->text);
+		r = debugger_command(text);
+		if (r) {
+			xprintf("error: %s: line %d\n", f->name, n);
+			return r;
+		}
+	}
+	return 0;
+}
+
+int debugger_command(char *line) {
 	param arg[32];
 	unsigned c, n = 0;
+	struct funcinfo *f;
 
 	while ((c = *line)) {
 		if (c <= ' ') {
@@ -470,21 +583,26 @@ void debugger_command(char *line) {
 	}
 
 	if (n == 0)
-		return;
+		return 0;
 
 	for (c = 0; c < n; c++) {
 		if (parse_number(arg[c].s, &(arg[c].n))) {
 			xprintf("error: bad number: %s\n", arg[c].s);
-			return;
+			return -1;
 		}
 	}
 
 	for (c = 0; c < (sizeof(CMD) / sizeof(CMD)[0]); c++) {
 		if (!strcasecmp(arg[0].s, CMD[c].name)) {
-			CMD[c].func(n - 1, arg + 1);
-			return;
+			return CMD[c].func(n - 1, arg + 1);
+		}
+	}
+	for (f = allfuncs; f; f = f->next) {
+		if (!strcasecmp(arg[0].s, f->name)) {
+			return exec_function(f, n - 1, arg + 1);
 		}
 	}
 	xprintf("unknown command: %s\n", arg[0].s);
+	return -1;
 }
 
