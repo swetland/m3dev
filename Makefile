@@ -1,4 +1,3 @@
-
 ## Copyright 2011 Brian Swetland <swetland@frotz.net>
 ## 
 ## Licensed under the Apache License, Version 2.0 (the "License");
@@ -31,64 +30,34 @@ TARGET_CFLAGS += -fno-builtin -nostdlib
 #TARGET_CFLAGS += -ffreestanding
 TARGET_CFLAGS += -Wl,--gc-sections
 TARGET_CFLAGS += -I. -Iinclude
-
-# config?
-TARGET_CFLAGS += -Iarch/stm32f1xx/include
-TARGET_CFLAGS += -Iarch/arm-cm3/include
 #TARGET_LIBGCC := $(shell $(TARGET_CC) $(TARGET_CFLAGS) -print-libgcc-file-name)
 
 HOST_CFLAGS := -g -O1 -Wall
 HOST_CFLAGS += -Itools -Iinclude
 
-#OUT := out/$(BOARD)
+include $(wildcard arch/*/config.mk)
+
 OUT := out
 OUT_HOST_OBJ := $(OUT)/host-obj
 OUT_TARGET_OBJ := $(OUT)/target-obj
 
 ALL :=
+DEPS :=
 
-include build/rules.mk
+MKDIR = if [ ! -d $(dir $@) ]; then mkdir -p $(dir $@); fi
 
-M_NAME := debugger
-M_OBJS := tools/debugger.o
-M_OBJS += tools/debugger-commands.o
-M_OBJS += tools/rswdp.o
-M_OBJS += tools/linenoise.o
-M_OBJS += tools/usb-linux.o
-include build/host-executable.mk
+QUIET ?= @
 
-M_NAME := gdb-bridge
-M_OBJS := tools/gdb-bridge.o
-M_OBJS += tools/debugger-commands.o
-M_OBJS += tools/rswdp.o
-M_OBJS += tools/linenoise.o
-M_OBJS += tools/usb-linux.o
-include build/host-executable.mk
-
-M_NAME := stm32boot
-M_OBJS := tools/stm32boot.o
-include build/host-executable.mk
-
-M_NAME := swdp
-M_LINK := build/stm32f103-rom.ld
-#M_LINK := build/stm32f103-ram.ld
-M_OBJS := arch/stm32f1xx/start.o
-M_OBJS += swdp/main.o
-M_OBJS += swdp/swdp.o
-M_OBJS += arch/stm32f1xx/gpio.o
-M_OBJS += arch/stm32f1xx/serial.o
-M_OBJS += arch/stm32f1xx/usb.o
-M_OBJS += libfw/print.o
-
-#M_LIBS := $(TARGET_LIBGCC)
-include build/target-executable.mk
+# additional modules
+include $(wildcard */module.mk)
 
 clean::
 	@echo clean
 	@rm -rf $(OUT)
 
-all:: $(ALL)
-
 # we generate .d as a side-effect of compiling. override generic rule:
 %.d:
 -include $(DEPS)
+
+all:: $(ALL)
+

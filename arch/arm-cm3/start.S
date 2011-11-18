@@ -11,7 +11,7 @@
 #define _IRQ(name) VECTOR(irq_##name)
 
 _start:
-	.long 0x20005000
+	.long CONFIG_STACKTOP
 	.long reset + 1
 	VECTOR(m3_nmi)
 	VECTOR(m3_hardfault)
