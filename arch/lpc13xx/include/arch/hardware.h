@@ -141,28 +141,28 @@
 #define USB_INT_RX_END		(1 << 12)
 #define USB_INT_TX_END		(1 << 13)
 
-#define USB_CC_WRITE(n)		((1 << 8) | ((n & 0xFF) << 16))
-#define USB_CC_READ(n)		((1 << 8) | ((n & 0xFF) << 16))
-#define USB_CC_COMMAND(n)	((1 << 8) | ((n & 0xFF) << 16))
-
 #define USB_CTRL_RD_EN		(1 << 0)
 #define USB_CTRL_WR_EN		(1 << 1)
 #define USB_CTRL_EP_NUM(n)	((n & 0xF) << 2)
 
-#define USB_CMD_SET_ADDR	0xD0
-#define USB_CMD_CONFIG_DEV	0xD8
-#define USB_CMD_SET_MODE	0xF3
-#define USB_CMD_RD_INT_STATUS	0xF4
-#define USB_CMD_RD_FRAME_NUM	0xF5
-#define USB_CMD_RD_CHIP_ID	0xFD
-#define USB_CMD_SET_DEV_STATUS	0xFE
-#define USB_CMD_GET_DEV_STATUS	0xFE
-#define USB_CMD_GET_ERROR_CODE	0xFF
-#define USB_CMD_SEL_EPT(n)	(n & 0xF)
-#define USB_CMD_CLR_EPT(n)	((n & 0xF) | 0x40)
-#define USB_CMD_SET_EPT(n)	((n & 0xF) | 0x40)
-#define USB_CMD_CLR_BUFFER	0xF2
-#define USB_CMD_VAL_BUFFER	0xFA
+#define USB_OP_WRITE		0x0100
+#define USB_OP_READ		0x0200
+#define USB_OP_COMMAND		0x0500
+
+#define USB_CC_SET_ADDR		0xD00000
+#define USB_CC_CONFIG_DEV	0xD80000
+#define USB_CC_SET_MODE		0xF30000
+#define USB_CC_RD_INT_STATUS	0xF40000
+#define USB_CC_RD_FRAME_NUM	0xF50000
+#define USB_CC_RD_CHIP_ID	0xFD0000
+#define USB_CC_SET_DEV_STATUS	0xFE0000
+#define USB_CC_GET_DEV_STATUS	0xFE0000
+#define USB_CC_GET_ERROR_CODE	0xFF0000
+#define USB_CC_SEL_EPT(n)	((n & 0xF) << 16)
+#define USB_CC_CLR_EPT(n)	(((n & 0xF) | 0x40) << 16)
+#define USB_CC_SET_EPT(n)	(((n & 0xF) | 0x40) << 16)
+#define USB_CC_CLR_BUFFER	0xF20000
+#define USB_CC_VAL_BUFFER	0xFA0000
 
 
 #define SSP0_CR0		0x40040000
@@ -198,7 +198,6 @@
 #define SSP_BUSY		(1 << 4)
 
 /* SSP bitrate = SYSCLK / SYS_DIV_SSPn / SSP_CR0_CLOCK_RATE */
-
 
 #define GPIOBASE(n)		(0x50000000 + ((n) << 16))
 #define GPIODATA(n)		(GPIOBASE(n) + 0x3FFC)
