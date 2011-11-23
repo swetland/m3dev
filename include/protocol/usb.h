@@ -1,0 +1,19 @@
+#ifndef _PROTOCOL_USB_H_
+#define _PROTOCOL_USB_H_
+
+#define DSC_DEVICE		0x01
+#define DSC_CONFIG		0x02
+#define DSC_STRING		0x03
+#define DSC_INTERFACE		0x04
+#define DSC_ENDPOINT		0x05
+
+#define SET_ADDRESS		0x0500
+#define GET_DESCRIPTOR		0x0680
+#define SET_DESCRIPTOR		0x0700
+#define GET_CONFIGURATION	0x0880
+#define SET_CONFIGURATION	0x0900
+#define GET_INTERFACE		0x0A81
+#define SET_INTERFACE		0x0B01
+
+#endif
+

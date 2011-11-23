@@ -20,6 +20,7 @@
 #include <fw/io.h>
 
 #include <arch/hardware.h>
+#include <protocol/usb.h>
 
 void usb_handle_irq(void);
 
@@ -70,20 +71,6 @@ void usb_handle_reset(void) {
 
 	writel(0x00 | USB_DADDR_ENABLE, USB_DADDR);
 }
-
-#define DSC_DEVICE		0x01
-#define DSC_CONFIG		0x02
-#define DSC_STRING		0x03
-#define DSC_INTERFACE		0x04
-#define DSC_ENDPOINT		0x05
-
-#define SET_ADDRESS		0x0500
-#define GET_DESCRIPTOR		0x0680
-#define SET_DESCRIPTOR		0x0700
-#define GET_CONFIGURATION	0x0880
-#define SET_CONFIGURATION	0x0900
-#define GET_INTERFACE		0x0A81
-#define SET_INTERFACE		0x0B01
 
 static u8 _dev00[] = {
 	18,		/* size */
