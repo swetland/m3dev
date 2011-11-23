@@ -51,5 +51,7 @@ void swdp_enable_tracing(int yes);
 
 void swdp_target_reset(int enable);
 
+int swdp_bootloader(void);
+
 #endif
 

@@ -54,6 +54,7 @@
 #define CMD_DOWNLOAD	0x06 /* arg=wordcount, payload: addr x 1, data x n */
 #define CMD_EXECUTE	0x07 /* payload: addr x 1 */
 #define CMD_TRACE	0x08 /* op=tracebits n=0 */
+#define CMD_BOOTLOADER	0x09 /* return to bootloader for reflashing */
 
 /* valid: target to host */
 #define CMD_STATUS	0x10 /* op=errorcode, arg=commands since last TXN_START */

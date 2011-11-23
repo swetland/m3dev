@@ -487,6 +487,12 @@ int swdp_watchpoint_rw(unsigned n, u32 addr) {
 	return swdp_watchpoint(n, addr, FUNC_WATCH_RW);
 }
 
+int swdp_bootloader(void) {
+	struct txn t;
+	q_init(&t);
+	t.tx[t.txc++] = RSWD_MSG(CMD_BOOTLOADER, 0, 0);
+	return q_exec(&t);
+}
 
 int swdp_reset(void) {
 	struct txn t;
@@ -496,7 +502,7 @@ int swdp_reset(void) {
 	t.tx[t.txc++] = RSWD_MSG(CMD_ATTACH, 0, 0);
 	t.tx[t.txc++] = SWD_RD(DP_IDCODE, 1);
 	t.rx[t.rxc++] = &idcode;
-	q_exec(&t);	
+	q_exec(&t);
 
 	fprintf(stderr,"IDCODE: %08x\n", idcode);
 

@@ -478,6 +478,10 @@ int do_print(int argc, param *argv) {
 	return 0;
 }
 
+int do_bootloader(int argc, param *argv) {
+	return swdp_bootloader();
+}
+
 struct cmd CMD[] = {
 	{ "exit",	"", do_exit,	"" },
 	{ "attach",	"", do_attach,	"attach/reattach to sw-dp" },
@@ -499,6 +503,7 @@ struct cmd CMD[] = {
 
 	{ "function",	"", do_function, "define a function" },
 	{ "end", 	"", do_end, "end definition" },
+	{ "bootloader", "", do_bootloader, "reboot into bootloader" },
 };
 
 int parse_number(const char *in, unsigned *out) {

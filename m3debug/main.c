@@ -33,7 +33,14 @@
 
 #define GPIO_RESET_N 0x20400
 
-unsigned swdp_trace;
+unsigned swdp_trace = 0;
+
+void reboot_bootloader(void) {
+	usb_stop();
+	writel(0x12345678, GPREG0);
+	writel(0xA5A50000, GPREG1);
+	reboot();
+}
 
 #define DEBUG_MAX 52
 static struct {
@@ -168,6 +175,9 @@ void process_txn(u32 txnid, u32 *rx, int rxc, u32 *tx) {
 		case CMD_TRACE:
 			swdp_trace = op;
 			continue;
+		case CMD_BOOTLOADER:
+			func = reboot_bootloader;
+			continue;
 		default:
 			printx("unknown command %b\n", RSWD_MSG_CMD(msg));
 			status = 1;
@@ -195,6 +205,7 @@ done:
 	usb_xmit(tx, txc * 4);
 
 	if (func) {
+		for (n = 0; n < 1000000; n++) asm("nop");
 		func();
 		for (;;) ;
 	}	

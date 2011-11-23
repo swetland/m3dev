@@ -10,5 +10,6 @@ M_OBJS += libfw/print.o
 M_OBJS += arch/lpc13xx/gpio.o
 M_OBJS += arch/lpc13xx/serial.o
 M_OBJS += arch/lpc13xx/usb.o
+M_OBJS += arch/lpc13xx/reboot.o
 include build/target-executable.mk
 
