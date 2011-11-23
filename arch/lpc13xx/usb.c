@@ -261,8 +261,6 @@ int usb_xmit(void *_data, int len) {
 	data = _data;
 	tx = 0;
 
-	printx("xmit %h %b\n", len, usb_online);
-
 	while (len > 0) {
 		if (!usb_online)
 			return -ENODEV;
@@ -275,7 +273,6 @@ int usb_xmit(void *_data, int len) {
 
 		xfer = (len > 64) ? 64 : len;
 
-		printx("xmit! %b\n", xfer);
 		writel(USB_CTRL_WR_EN | USB_CTRL_EP_NUM(1), USB_CTRL);
 		writel(xfer, USB_TX_PLEN);
 		tx += xfer;
