@@ -33,10 +33,10 @@ void swdp_interrupt(void) {
 	write(2, "\b\b*INTERRUPT*\n", 16);
 }
 
-static int match_18d1_6502(usb_ifc_info *ifc) {
+static int match_18d1_db03(usb_ifc_info *ifc) {
 	if (ifc->dev_vendor != 0x18d1)
 		return -1;
-	if (ifc->dev_product != 0x6502)
+	if (ifc->dev_product != 0xdb03)
 		return -1;
 	return 0;
 }
@@ -537,7 +537,7 @@ void swdp_target_reset(int enable) {
 }
 
 int swdp_open(void) {
-	usb = usb_open(match_18d1_6502);
+	usb = usb_open(match_18d1_db03);
 	if (usb == 0) {
 		fprintf(stderr,"could not find device\n");
 		return -1;

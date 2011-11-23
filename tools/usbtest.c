@@ -22,10 +22,10 @@
 
 #include "usb.h"
 
-static int match_18d1_6502(usb_ifc_info *ifc) {
+static int match_18d1_db01(usb_ifc_info *ifc) {
 	if (ifc->dev_vendor != 0x18d1)
 		return -1;
-	if (ifc->dev_product != 0x6502)
+	if (ifc->dev_product != 0xdb01)
 		return -1;
 	return 0;
 }
@@ -41,7 +41,7 @@ int main(int argc, char **argv) {
 			return -1;
 	}
 
-	usb = usb_open(match_18d1_6502);
+	usb = usb_open(match_18d1_db01);
 	if (usb == 0) {
 		fprintf(stderr, "cannot find device\n");
 		return -1;

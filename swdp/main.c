@@ -247,7 +247,7 @@ int main() {
 	irq_enable(i_usb_hp);
 #endif
 
-	usb_init(0x18d1, 0x6502);
+	usb_init(0x18d1, 0xdb03);
 
 	for (;;) {
 		gpio_clr(GPIO_LED);

@@ -216,7 +216,7 @@ int main() {
 	printx("[ rswdp agent v0.9 ]\n");
 	printx("[ built " __DATE__ " " __TIME__ " ]\n");
 
-	usb_init(0x18d1, 0x6502);
+	usb_init(0x18d1, 0xdb03);
 
 	for (;;) {
 		gpio_clr(GPIO_LED0);
