@@ -356,8 +356,13 @@ int usb_xmit(void *data, int len) {
 	return tx;
 }
 
-void usb_init(void) {
+void usb_init(unsigned vid, unsigned pid) {
 	unsigned n;
+
+	_dev00[8] = vid;
+	_dev00[9] = vid >> 8;
+	_dev00[10] = pid;
+	_dev00[11] = pid >> 8;
 
 	/* enable GPIOC */
 	writel(readl(RCC_APB2ENR) | RCC_APB2_GPIOC, RCC_APB2ENR);

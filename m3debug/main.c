@@ -195,8 +195,13 @@ done:
 	}	
 }
 
+#if 1
+static u32 rxbuffer[512];
+static u32 txbuffer[512];
+#else
 static u32 rxbuffer[1024];
 static u32 txbuffer[768];
+#endif
 
 int main() {
 	int rxc;
@@ -211,7 +216,7 @@ int main() {
 	printx("[ rswdp agent v0.9 ]\n");
 	printx("[ built " __DATE__ " " __TIME__ " ]\n");
 
-	usb_init();
+	usb_init(0x18d1, 0x6502);
 
 	for (;;) {
 		gpio_clr(GPIO_LED0);

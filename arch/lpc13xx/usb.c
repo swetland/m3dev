@@ -22,7 +22,7 @@
 #include <arch/hardware.h>
 #include <protocol/usb.h>
 
-volatile unsigned msec_counter = 0;
+static volatile unsigned msec_counter = 0;
 
 void usb_handle_irq(void);
 
@@ -208,12 +208,17 @@ void usb_ep0_tx(void) {
 }
 
 int usb_recv(void *_data, int count) {
+	return usb_recv_timeout(_data, count, 0);
+}
+
+int usb_recv_timeout(void *_data, int count, unsigned timeout) {
 	unsigned n;
 	int sz, rx, xfer;
 	u32 *data;
 
 	data = _data;
 	rx = 0;
+	msec_counter = 0;
 
 	/* if offline, wait for us to go online */
 	while (!usb_online)
@@ -225,6 +230,8 @@ int usb_recv(void *_data, int count) {
 
 		n = read_sie(USB_CC_SEL_EPT(2));
 		if (!(n & 1)) {
+			if (timeout && (msec_counter > timeout))
+				return -ETIMEOUT;
 			usb_handle_irq();
 			continue;
 		}
@@ -290,8 +297,15 @@ int usb_xmit(void *_data, int len) {
 }
 
 
-void usb_init(void) {
+void usb_init(unsigned vid, unsigned pid) {
+	unsigned n;
+
 	ep0state = EP0_IDLE;
+
+	_dev00[8] = vid;
+	_dev00[9] = vid >> 8;
+	_dev00[10] = pid;
+	_dev00[11] = pid >> 8;
 
 	/* SYSCLK to USB REG domain */
 	writel(readl(SYS_CLK_CTRL) | SYS_CLK_USB_REG, SYS_CLK_CTRL);
@@ -300,11 +314,12 @@ void usb_init(void) {
 	writel(readl(0x40048238) & (~(1 << 10)), 0x40048238);
 	writel(readl(0x40048238) & (~(1 << 8)), 0x40048238);
 
+	/* wait for power */
+	for (n = 0; n < 10000; n++) asm("nop");
+
 	/* configure external IO mapping */
 	writel(IOCON_FUNC_1 | IOCON_DIGITAL, IOCON_PIO0_3); /* USB_VBUS */
 	writel(IOCON_FUNC_1 | IOCON_DIGITAL, IOCON_PIO0_6); /* USB_CONNECTn */
-	
-	printx("usb_init()\n");
 
 	write_sie(USB_CC_SET_ADDR, 0x80); /* ADDR=0, EN=1 */
 	write_sie(USB_CC_SET_DEV_STATUS, 0x01); /* CONNECT */
@@ -316,8 +331,6 @@ void usb_handle_irq(void) {
 	writel(n, USB_INT_CLEAR);
 	if (n & USB_INT_FRAME)
 		msec_counter++;
-	if (n & USB_INT_DEV_STAT)
-		printx("DEVSTAT\n");
 	if (n & USB_INT_EP0)
 		usb_ep0_rx();
 	if (n & USB_INT_EP1)

@@ -18,9 +18,10 @@
 #ifndef _FW_LIB_H_
 #define _FW_LIB_H_
 
-#define EFAIL   1
-#define EBUSY   2
-#define ENODEV  3
+#define EFAIL		1
+#define EBUSY		2
+#define ENODEV		3
+#define ETIMEOUT	4
 
 #include <stdarg.h>
 
@@ -34,9 +35,30 @@ void gpio_config(unsigned n, unsigned cfg);
 void gpio_set(unsigned n);
 void gpio_clr(unsigned n);
 
-void usb_init(void);
+/* init USB and attach */
+void usb_init(unsigned vid, unsigned pid);
+
+/* detach from USB */
+void usb_stop(void);
+
+/* read up to len bytes on bulk in
+ * - stops on a short packet
+ * - returns bytes read
+ * - returns -ENODEV if USB went offline
+ */
 int usb_recv(void *data, int len);
+
+/* send len bytes on bulk out
+ * - returns bytes written
+ * - returns -ENODEV if USB went offline
+ */
 int usb_xmit(void *data, int len);
+
+/* same as usb_recv but returns -ETIMEOUT
+ * if msec milliseconds pass. 
+ * wait forever if msec == 0
+ */
+int usb_recv_timeout(void *data, int len, unsigned msec);
 
 #endif
 
