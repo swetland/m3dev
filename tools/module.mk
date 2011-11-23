@@ -18,3 +18,12 @@ include build/host-executable.mk
 M_NAME := stm32boot
 M_OBJS := tools/stm32boot.o
 include build/host-executable.mk
+
+M_NAME := usbmon
+M_OBJS := tools/usbmon.o
+include build/host-executable.mk
+
+M_NAME := usbtest
+M_OBJS := tools/usbtest.o
+M_OBJS += tools/usb-linux.o
+include build/host-executable.mk
