@@ -325,6 +325,11 @@ void usb_init(unsigned vid, unsigned pid) {
 	write_sie(USB_CC_SET_DEV_STATUS, 0x01); /* CONNECT */
 }
 
+void usb_stop(void) {
+	write_sie(USB_CC_SET_ADDR, 0);
+	write_sie(USB_CC_SET_DEV_STATUS, 0);
+}
+
 void usb_handle_irq(void) {
 	unsigned n;
 	n = readl(USB_INT_STATUS);
