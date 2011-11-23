@@ -195,7 +195,7 @@ done:
 	}	
 }
 
-#if 1
+#if 0 
 static u32 rxbuffer[512];
 static u32 txbuffer[512];
 #else
