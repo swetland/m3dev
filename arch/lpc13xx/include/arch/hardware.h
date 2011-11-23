@@ -203,4 +203,11 @@
 #define GPIODATA(n)		(GPIOBASE(n) + 0x3FFC)
 #define GPIODIR(n)		(GPIOBASE(n) + 0x8000)
 
+/* these registers survive powerdown / warm reboot */
+#define GPREG0			0x40038004
+#define GPREG1			0x40038008
+#define GPREG2			0x4003800C
+#define GPREG3			0x40038010
+#define GPREG4			0x40038014
+
 #endif

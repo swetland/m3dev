@@ -17,6 +17,9 @@
 
 #include <fw/types.h>
 #include <fw/lib.h>
+#include <fw/io.h>
+
+#include <arch/hardware.h>
 
 #define GPIO_LED0 0x00004
 #define GPIO_LED1 0x20080
@@ -94,6 +97,10 @@ static u32 buf[64];
 
 void start_image(u32 pc, u32 sp);
 
+void _boot_image(void *img) {
+	start_image(((u32*)img)[1], ((u32*)img)[0]);
+}
+
 void boot_image(void *img) {
         gpio_config(GPIO_LED0, 0);
         gpio_config(GPIO_LED1, 0);
@@ -103,7 +110,7 @@ void boot_image(void *img) {
 	usb_stop();
 
 	/* TODO: shut down various peripherals */
-	start_image(((u32*)img)[1], ((u32*)img)[0]);
+	_boot_image(img);
 }
 
 void handle(u32 magic, u32 cmd, u32 arg) {
@@ -155,6 +162,16 @@ void handle(u32 magic, u32 cmd, u32 arg) {
 		usb_xmit(reply, 8);
 		usb_xmit(&DEVICE, sizeof(DEVICE));
 		return;
+	case 'A':
+		/* reboot-into-app -- signal to bootloader via GPREGn */
+		writel(0x12345678, GPREG0);
+		writel(0xA5A50001, GPREG1);
+	case 'R':
+		/* reboot "normally" */
+		reply[1] = 0;
+		usb_xmit(reply, 8);
+		usb_recv_timeout(buf, 64, 10);
+		reboot();
 	default:
 		break;
 	}
@@ -164,6 +181,17 @@ void handle(u32 magic, u32 cmd, u32 arg) {
 int main() {
 	int n, x, timeout;
 	u32 tmp;
+	u32 gpr0,gpr1;
+
+	/* sample GPREG and clear */
+	gpr0 = readl(GPREG0);
+	gpr1 = readl(GPREG1);
+	writel(0xBBBBBBBB, GPREG0);
+	writel(0xBBBBBBBB, GPREG1);
+
+	/* request to boot directly into the "app" image */
+	if ((gpr0 == 0x12345678) && (gpr1 == 0xA5A50001))
+		_boot_image((void*) 0x1000);
 
 	board_init();
         gpio_config(GPIO_LED0, 1);
@@ -173,11 +201,15 @@ int main() {
 
 	usb_init(0x18d1,0xdb00);
 
+	/* check for an app image and set a 3s timeout if it exists */
 	tmp = *((u32*) 0x1000);
-
 	if ((tmp != 0) && (tmp != 0xFFFFFFFF))
 		timeout = 30;
 	else
+		timeout = 0;
+
+	/* request to stay in the bootloader forever? */
+	if ((gpr0 == 0x12345678) && (gpr1 == 0xA5A50000))
 		timeout = 0;
 
 	x = 0;
@@ -206,8 +238,11 @@ int main() {
 		}
 	}
 
-	boot_image((void*) 0x1000);
+	/* warm reset into the app */
+	writel(0x12345678, GPREG0);
+	writel(0xA5A50001, GPREG1);
+	reboot();
 
-	for (;;) ;
+	return 0;
 }
 

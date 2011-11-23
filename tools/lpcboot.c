@@ -33,7 +33,14 @@ static int match_18d1_db00(usb_ifc_info *ifc) {
 }
 
 int usage(void) {
-	fprintf(stderr,"usage: lpcboot [ flash <bin> | boot <bin> | erase ]\n");
+	fprintf(stderr,
+		"lpcboot usage\n-------------\n"
+		" lpcboot query         display information about target\n"
+		" lpcboot boot <app>    download app to ram and execute\n"
+		" lpcboot flash <app>   write app image to flash\n"
+		" lpcboot erase         erase app image\n"
+		" lpcboot reboot        reboot the bootloader\n"
+		" lpcboot app           reboot into the app in flash\n");
 	return -1;
 }
 
@@ -69,11 +76,13 @@ int main(int argc, char **argv) {
 		dl = 1;
 		cmd[1] = 'X';
 	} else if (!strcmp(argv[1],"erase")) {
-		dl = 0;
 		cmd[1] = 'E';
 	} else if (!strcmp(argv[1],"query")) {
-		dl = 0;
 		cmd[1] = 'Q';
+	} else if (!strcmp(argv[1],"reboot")) {
+		cmd[1] = 'R';
+	} else if (!strcmp(argv[1],"app")) {
+		cmd[1] = 'A';
 	} else {
 		return usage();
 	}
