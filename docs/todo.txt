@@ -1,7 +1,6 @@
 
 - debugger
   - more script work (integration of erase/flash scripts, etc)
-  - hunt down what's causing us to wedge up on dw XXX 30
   - flash support for stm32 parts
   - async/background usb io (to allow for serial trace, ITM trace, etc)
   - quieter script execution mode

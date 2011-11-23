@@ -177,7 +177,12 @@ void process_txn(u32 txnid, u32 *rx, int rxc, u32 *tx) {
 
 done:
 	tx[txc++] = RSWD_MSG(CMD_STATUS, status, count);
-	if ((txc & 0x3f) == 0)
+
+	/* if we're about to send an even multiple of the packet size
+	 * (64), add a NULL op on the end to create a short packet at
+	 * the end.
+	 */
+	if ((txc & 0xf) == 0)
 		tx[txc++] = RSWD_MSG(CMD_NULL, 0, 0);
 
 #if TRACE
