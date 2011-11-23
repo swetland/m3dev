@@ -27,3 +27,12 @@ M_NAME := usbtest
 M_OBJS := tools/usbtest.o
 M_OBJS += tools/usb-linux.o
 include build/host-executable.mk
+
+M_NAME := bless-lpc
+M_OBJS := tools/bless-lpc.o
+include build/host-executable.mk
+
+M_NAME := lpcboot
+M_OBJS := tools/lpcboot.o
+M_OBJS += tools/usb-linux.o
+include build/host-executable.mk

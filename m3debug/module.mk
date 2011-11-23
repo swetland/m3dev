@@ -1,6 +1,7 @@
 M_NAME := m3debug 
 M_ARCH := lpc13xx
-M_LINK := build/lpc1343-rom.ld
+#M_LINK := build/lpc1343-ram.ld
+M_LINK := build/lpc1343-app.ld
 M_OBJS := arch/arm-cm3/start.o
 M_OBJS += m3debug/main.o
 M_OBJS += m3debug/swdp.o
