@@ -44,7 +44,7 @@ reset:
 	/* this simplifies building-for-ram */
 	cmp r1, r2
 	bne copydata
-	mov r2, r4
+	mov r2, r3
 	b zerobss
 
 copydata:
