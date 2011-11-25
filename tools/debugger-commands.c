@@ -482,6 +482,12 @@ int do_bootloader(int argc, param *argv) {
 	return swdp_bootloader();
 }
 
+int do_setclock(int argc, param *argv) {
+	if (argc < 1)
+		return -1;
+	return swdp_set_clock(argv[0].n);
+}
+
 struct cmd CMD[] = {
 	{ "exit",	"", do_exit,	"" },
 	{ "attach",	"", do_attach,	"attach/reattach to sw-dp" },
@@ -504,6 +510,7 @@ struct cmd CMD[] = {
 	{ "function",	"", do_function, "define a function" },
 	{ "end", 	"", do_end, "end definition" },
 	{ "bootloader", "", do_bootloader, "reboot into bootloader" },
+	{ "setclock", "", do_setclock, "set clock rate (khz)" },
 };
 
 int parse_number(const char *in, unsigned *out) {

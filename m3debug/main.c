@@ -178,6 +178,10 @@ void process_txn(u32 txnid, u32 *rx, int rxc, u32 *tx) {
 		case CMD_BOOTLOADER:
 			func = reboot_bootloader;
 			continue;
+		case CMD_SET_CLOCK:
+			n = set_swdp_clock(n);
+			printu("swdp clock is now 0x%x KHz\n", n);
+			continue;
 		default:
 			printx("unknown command %b\n", RSWD_MSG_CMD(msg));
 			status = 1;

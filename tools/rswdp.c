@@ -542,6 +542,17 @@ void swdp_target_reset(int enable) {
 	q_exec(&t);
 }
 
+int swdp_set_clock(unsigned khz) {
+	struct txn t;
+	if (khz > 0xFFFF)
+		return -1;
+	if (khz < 1000)
+		khz = 1000;
+	q_init(&t);
+	t.tx[t.txc++] = RSWD_MSG(CMD_SET_CLOCK, 0, khz);
+	return q_exec(&t);
+}
+	
 int swdp_open(void) {
 	usb = usb_open(match_18d1_db03);
 	if (usb == 0) {

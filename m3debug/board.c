@@ -66,13 +66,13 @@ void board_init(void) {
 
 	serial_init(48000000,115200);
 
-	/* SSP0 PCLK = SYSCLK / 1 (8MHz) */
-	writel(2, SYS_DIV_SSP0);
+	/* SSP0 PCLK = SYSCLK / 3 (16MHz) */
+	writel(3, SYS_DIV_SSP0);
 
 	/* deassert reset */
 	writel(readl(PRESETCTRL) | SSP0_RST_N, PRESETCTRL);
 
-	writel(2, SSP0_CPSR); /* prescale = PCLK/2 */
+	writel(2, SSP0_CPSR); /* prescale = PCLK/2 (8MHz) */
 	writel(SSP_CR0_BITS(16) | SSP_CR0_FRAME_SPI |
 		SSP_CR0_CLK_HIGH | SSP_CR0_PHASE1 |
 		SSP_CR0_CLOCK_RATE(1),
@@ -84,4 +84,31 @@ void board_init(void) {
 	writel(IOCON_FUNC_1 | IOCON_DIGITAL, IOCON_PIO0_9); /* MOSI */
 	writel(IOCON_FUNC_1 | IOCON_DIGITAL, IOCON_PIO2_11); /* SCK */
 }
+
+static struct {
+	u16 khz;
+	u16 div;
+} clocks[] = {
+	{ 24000, 1, },
+	{ 12000, 2, },
+	{  8000, 3, },
+	{  6000, 4, },
+	{  4000, 6, },
+	{  3000, 8, },
+	{  2000, 12, },
+	{  1000, 24, }, 
+};
+
+unsigned set_swdp_clock(unsigned khz) {
+	int n;
+	if (khz < 1000)
+		khz = 1000;
+	for (n = 0; n < (sizeof(clocks)/sizeof(clocks[0])); n++) {
+		if (clocks[n].khz <= khz) {
+			writel(clocks[n].div, SYS_DIV_SSP0);
+			return clocks[n].khz;
+		}
+	}
+	return 0;
+} 
 
