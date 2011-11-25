@@ -15,9 +15,8 @@
  * limitations under the License.
  */
 
-#include "lib.h"
-#include "io.h"
-#include "m3.h"
+#include <fw/types.h>
+#include <fw/io.h>
 
 #define NVIC_ICTR		0xE000E004
 #define NVIC_SET_ENABLE		0xE000E100
@@ -36,8 +35,7 @@
 #define NVIC_SW_IRQ_TRIGGER	0xE000EF00
 
 void irq_enable(unsigned n) {
-	//writel(1 << (n & 31), NVIC_SET_ENABLE + (n >> 5) * 4);
-	printx("IRQ %b %x -> %x\n", n, 1 << (n & 31), NVIC_SET_ENABLE + (n >> 5) * 4);
+	writel(1 << (n & 31), NVIC_SET_ENABLE + (n >> 5) * 4);
 }
 
 void irq_disable(unsigned n) {
