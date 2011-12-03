@@ -20,6 +20,8 @@
 #include <unistd.h>
 #include <string.h>
 #include <ctype.h>
+#include <stdarg.h>
+
 #include <fcntl.h>
 #include <sys/time.h>
 
@@ -30,6 +32,12 @@
 #include <fw/types.h>
 #include <protocol/rswdp.h>
 #include "rswdp.h"
+
+#define printf __use_xprintf_in_debugger_commands_c__
+extern void xprintf(const char *fmt, ...);
+
+#define ERROR		-1
+#define ERROR_UNKNOWN 	-2
 
 struct funcline {
 	struct funcline *next;
@@ -42,6 +50,42 @@ struct funcinfo {
 	char name[0];
 };
 
+struct varinfo {
+	struct varinfo *next;
+	u32 value;
+	char name[0];
+};
+
+static struct varinfo *all_variables = 0;
+
+static void variable_set(const char *name, u32 value) {
+	struct varinfo *vi;
+	int len;
+	for (vi = all_variables; vi; vi = vi->next) {
+		if (!strcmp(name, vi->name)) {
+			vi->value = value;
+			return;
+		}
+	}
+	len = strlen(name) + 1;
+	vi = malloc(sizeof(*vi) + len);
+	memcpy(vi->name, name, len);
+	vi->value = value;
+	vi->next = all_variables;
+	all_variables = vi;
+}
+
+static int variable_get(const char *name, u32 *value) {
+	struct varinfo *vi;
+	for (vi = all_variables; vi; vi = vi->next) {
+		if (!strcmp(name, vi->name)) {
+			*value = vi->value;
+			return 0;
+		}
+	}
+	return -1;
+}
+
 int debugger_command(char *line);
 
 long long now() {
@@ -49,10 +93,6 @@ long long now() {
 	gettimeofday(&tv, 0);
 	return ((long long) tv.tv_usec) + ((long long) tv.tv_sec) * 1000000LL;
 }
-
-#define printf __use_xprintf_in_debugger_commands_c__
-
-extern void xprintf(const char *fmt, ...);
 
 extern int disassemble_thumb2(u32 addr, u16 op0, u16 op1,
 		char *text, int len) __attribute__ ((weak));
@@ -194,7 +234,7 @@ static int get_register(const char *name, u32 *value) {
 			return 0;
 		}
 	}
-	return -2;
+	return ERROR_UNKNOWN;
 }
 
 int do_dr(int argc, param *argv) {
@@ -488,6 +528,27 @@ int do_setclock(int argc, param *argv) {
 	return swdp_set_clock(argv[0].n);
 }
 
+int do_set(int argc, param *argv) {
+	const char *name;
+	if (argc != 2) {
+		xprintf("error: set requires two arguments\n");
+		return -1;
+	}
+	name = argv[0].s;
+	if (*name == '$')
+		name++;
+	if (*name == 0) {
+		xprintf("error: empty name?!\n");
+		return -1;
+	}
+	if (!isalpha(*name)) {
+		xprintf("error: variable name must begin with a letter\n");
+		return -1;
+	}
+	variable_set(name, argv[1].n);
+	return 0;
+}
+
 struct cmd CMD[] = {
 	{ "exit",	"", do_exit,	"" },
 	{ "attach",	"", do_attach,	"attach/reattach to sw-dp" },
@@ -511,6 +572,7 @@ struct cmd CMD[] = {
 	{ "end", 	"", do_end, "end definition" },
 	{ "bootloader", "", do_bootloader, "reboot into bootloader" },
 	{ "setclock", "", do_setclock, "set clock rate (khz)" },
+	{ "set",	"", do_set, "set <var> <value>" },
 };
 
 int parse_number(const char *in, unsigned *out) {
@@ -539,8 +601,18 @@ int parse_number(const char *in, unsigned *out) {
 		*out = value;
 		return 0;	
 	} else {
-		int r = get_register(text, &value);
-		if (r != -2) {
+		int r;
+		if (text[0] == '$') {
+			if (variable_get(text + 1, &value) == 0) {
+				*out = value;
+			} else {
+				xprintf("undefined variable '%s'\n", text + 1);
+				*out = 0;
+			}
+			return 0;
+		}
+		r = get_register(text, &value);
+		if (r != ERROR_UNKNOWN) {
 			*out = value;
 			return r;
 		}
@@ -570,10 +642,43 @@ int exec_function(struct funcinfo *f, int argc, param *argv) {
 	return 0;
 }
 
+static int _debugger_exec(const char *cmd, unsigned argc, param *argv) {
+	struct funcinfo *f;
+	unsigned c;
+
+	for (c = 0; c < (sizeof(CMD) / sizeof(CMD)[0]); c++) {
+		if (!strcasecmp(cmd, CMD[c].name)) {
+			return CMD[c].func(argc, argv);
+		}
+	}
+	for (f = allfuncs; f; f = f->next) {
+		if (!strcasecmp(cmd, f->name)) {
+			return exec_function(f, argc, argv);
+		}
+	}
+	return ERROR_UNKNOWN;
+}
+
+int debugger_invoke(const char *cmd, unsigned argc, ...) {
+	param arg[32];
+	unsigned n;
+	va_list ap;
+
+	if (argc > 31)
+		return -1;
+
+	va_start(ap, argc);
+	for (n = 0; n < argc; n++) {
+		arg[n].s = "";
+		arg[n].n = va_arg(ap, unsigned);
+	}
+	return _debugger_exec(cmd, argc, arg);
+}
+
 int debugger_command(char *line) {
 	param arg[32];
 	unsigned c, n = 0;
-	struct funcinfo *f;
+	int r;
 
 	while ((c = *line)) {
 		if (c <= ' ') {
@@ -604,17 +709,10 @@ int debugger_command(char *line) {
 		}
 	}
 
-	for (c = 0; c < (sizeof(CMD) / sizeof(CMD)[0]); c++) {
-		if (!strcasecmp(arg[0].s, CMD[c].name)) {
-			return CMD[c].func(n - 1, arg + 1);
-		}
+	r = _debugger_exec(arg[0].s, n - 1, arg + 1);
+	if (r == ERROR_UNKNOWN) {
+		xprintf("unknown command: %s\n", arg[0].s);
 	}
-	for (f = allfuncs; f; f = f->next) {
-		if (!strcasecmp(arg[0].s, f->name)) {
-			return exec_function(f, n - 1, arg + 1);
-		}
-	}
-	xprintf("unknown command: %s\n", arg[0].s);
-	return -1;
+	return r;
 }
 
