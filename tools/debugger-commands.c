@@ -395,6 +395,12 @@ int do_download(int argc, param *argv) {
 }
 
 int do_reset(int argc, param *argv) {
+	swdp_core_halt();	
+	swdp_ahb_write(CDBG_EMCR, 0);
+	/* core reset and sys reset */
+	swdp_ahb_write(0xe000ed0c, 0x05fa0005);
+	swdp_ahb_write(CDBG_EMCR, 0);
+#if 0
 	if (argc > 0) {
 		swdp_target_reset(argv[0].n);
 	} else {
@@ -402,17 +408,24 @@ int do_reset(int argc, param *argv) {
 		usleep(10000);
 		swdp_target_reset(0);
 	}
+#endif
 	return 0;
 }
 
 int do_reset_stop(int argc, param *argv) {
 	swdp_core_halt();
 	swdp_ahb_write(CDBG_EMCR, 1);
+#if 1
+	/* core reset and sys reset */
+	swdp_ahb_write(0xe000ed0c, 0x05fa0005);
+#else
 	swdp_target_reset(1);
 	usleep(10000);
 	swdp_target_reset(0);
 	usleep(10000);
+#endif
 	do_stop(0,0);
+	swdp_ahb_write(CDBG_EMCR, 0);
 	return 0;
 }
 
