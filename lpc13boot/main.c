@@ -21,10 +21,19 @@
 
 #include <arch/hardware.h>
 
+#if 1
 #define GPIO_LED0 0x00004
 #define GPIO_LED1 0x20080
 #define GPIO_LED2 0x20100
 #define GPIO_LED3 0x20002
+#define BOARDNAME "M3DEBUG"
+#else
+#define GPIO_LED0 0x30001
+#define GPIO_LED1 0x30002
+#define GPIO_LED2 0x30004
+#define GPIO_LED3 0x30008
+#define BOARDNAME "LPC-P1343"
+#endif
 
 #define RAM_BASE	0x10000000
 #define RAM_SIZE	(7 * 1024)
@@ -56,7 +65,7 @@ struct device_info {
 
 struct device_info DEVICE = {
 	.part = "LPC1343",
-	.board = "M3DEBUG",
+	.board = BOARDNAME,
 	.version = 0x0001000,
 	.ram_base = RAM_BASE,
 	.ram_size = RAM_SIZE,
