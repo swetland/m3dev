@@ -41,7 +41,7 @@ $(OUT_TARGET_OBJ)/$(M_NAME)/%.o: %.S
 	$(QUIET)$(TARGET_CC) $(TARGET_CFLAGS) $(_CFLAGS) -c $< -o $@ -MD -MT $@ -MF $(@:%o=%d)
 
 # apply our flags to our objects
-$(M_OBJS): _CFLAGS := $(M_ARCH_CFLAGS)
+$(M_OBJS): _CFLAGS := $(M_ARCH_CFLAGS) $(M_CFLAGS)
 
 $(OUT)/$(M_NAME).bin: _SRC := $(OUT)/$(M_NAME)
 $(OUT)/$(M_NAME).bin: $(OUT)/$(M_NAME)
@@ -67,3 +67,4 @@ M_NAME :=
 M_BASE :=
 M_LIBS :=
 M_ARCH :=
+M_CFLAGS :=
