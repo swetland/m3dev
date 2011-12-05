@@ -201,7 +201,14 @@
 
 #define GPIOBASE(n)		(0x50000000 + ((n) << 16))
 #define GPIODATA(n)		(GPIOBASE(n) + 0x3FFC)
-#define GPIODIR(n)		(GPIOBASE(n) + 0x8000)
+#define GPIODIR(n)		(GPIOBASE(n) + 0x8000) /* 0 = input, 1 = output */
+#define GPIOIER(n)		(GPIOBASE(n) + 0x8010) /* 1 = irq enabled */
+#define GPIOLEVEL(n)		(GPIOBASE(n) + 0x8004) /* 0 = edge, 1 = level irq */
+#define GPIOBOTHEDGES(n)	(GPIOBASE(n) + 0x8008) /* 1 = trigger on both edges */
+#define GPIOPOLARITY(n)		(GPIOBASE(n) + 0x800C) /* 0 = low/falling, 1 = high/rising */
+#define GPIORAWISR(n)		(GPIOBASE(n) + 0x8014) /* 1 if triggered */
+#define GPIOISR(n)		(GPIOBASE(n) + 0x8018) /* 1 if triggered and enabled */
+#define GPIOICR(n)		(GPIOBASE(n) + 0x801C) /* write 1 to clear, 2 clock delay */
 
 /* these registers survive powerdown / warm reboot */
 #define GPREG0			0x40038004
