@@ -209,6 +209,30 @@ int do_wr(int argc, param *argv) {
 	return 0;
 }
 
+int do_text(int argc, param *argv) {
+	u8 data[1024], *x;
+	u32 addr;
+
+	if (argc < 1)
+		return -1;
+	addr = argv[0].n;
+	memset(data, 0, sizeof(data));
+	
+	if (swdp_ahb_read32(addr, (void*) data, sizeof(data)/4))
+		return -1;
+
+	data[sizeof(data)-1] = 0;
+	for (x = data; *x; x++) {
+		if ((*x >= ' ') && (*x < 128))
+			continue;
+		if (*x == '\n')
+			continue;
+		*x = '.';
+	}
+	fprintf(stderr,"%s\n", (char*) data);
+	return 0;
+}
+
 static u32 lastaddr = 0x20000000;
 static u32 lastcount = 0x40;
 
@@ -496,6 +520,7 @@ struct debugger_command debugger_commands[] = {
 	{ "print",	"", do_print,	"print numeric arguments" },
 	{ "bootloader", "", do_bootloader, "reboot into bootloader" },
 	{ "setclock",	"", do_setclock, "set clock rate (khz)" },
+	{ "text",	"", do_text, "dump text" },
 	{ 0, 0, 0, 0 },
 };
 
