@@ -169,6 +169,47 @@ static void radio_tx(void) {
 	}
 }
 
+static void radio_rx2(void) {
+	unsigned n, m;
+
+	/* pos edge */
+	writel(readl(GPIOPOLARITY(1)) | (1<<6), GPIOPOLARITY(1));
+
+	m = 1;
+	for (;;) {
+		LED(m);
+		RX_START++;
+		writel((1<<6), GPIOICR(1));
+		cc_cmd(CC_CMD_SRX);
+
+		/* wait for IRQ */
+		while (!(readl(GPIORAWISR(1)) & (1<<6))) ;
+
+		do {
+			n = cc_rd(CC_PKTSTATUS);
+		} while (n != cc_rd(CC_PKTSTATUS));
+
+		if (n & 0x80) {
+			if (cc_rd(CC_RXBYTES) == 16) {
+				for(n = 0; n < 16; n++)
+					PACKET[n] = cc_rd(0x3F);
+				RX_OKAY++;
+				m++;
+			} else {
+				RX_NON16++;
+			}
+		} else {
+			RX_IDLE_OUT++;
+		}
+
+		/* reset to idle in the event of an overflow */
+		if (cc_state() == CC_S_RX_OVF) {
+			RX_OVERFLOW++;
+			cc_cmd(CC_S_IDLE);
+		}
+	}
+}
+
 static void radio_rx(void) {
 	unsigned s, n, m;
 
@@ -234,7 +275,7 @@ int main() {
 #if CONFIG_TX
 	radio_tx();
 #elif CONFIG_RX
-	radio_rx();
+	radio_rx2();
 #else
 #error not configured
 #endif
