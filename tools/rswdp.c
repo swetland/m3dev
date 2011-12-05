@@ -438,6 +438,18 @@ int swdp_core_wait_for_halt(void) {
 	}
 }
 
+int swdp_ahb_wait_for_change(u32 addr, u32 oldval) {
+	int last = ATTN;
+	u32 val;
+	do {
+		if (swdp_ahb_read(addr, &val))
+			return -1;
+		if (ATTN != last)
+			return -2;
+	} while (val == oldval);
+	return 0;
+}
+
 int swdp_core_resume(void) {
 	/* must leave DEBUGEN on to halt on vector catch, breakpoints, etc */
 	return swdp_ahb_write(CDBG_CSR, CDBG_CSR_KEY | CDBG_C_DEBUGEN);

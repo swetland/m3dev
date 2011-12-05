@@ -25,6 +25,9 @@ int swdp_ahb_write(u32 addr, u32 value);
 int swdp_ahb_read32(u32 addr, u32 *out, int count);
 int swdp_ahb_write32(u32 addr, u32 *out, int count);
 
+/* return 0 when *addr != oldval, -1 on error, -2 on interrupt */
+int swdp_ahb_wait_for_change(u32 addr, u32 oldval);
+
 int swdp_core_halt(void);
 int swdp_core_step(void);
 int swdp_core_resume(void);
