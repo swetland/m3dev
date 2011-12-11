@@ -21,18 +21,26 @@
 
 #include <arch/hardware.h>
 
-#if 1
+#if BOARD_M3DEBUG
 #define GPIO_LED0 0x00004
 #define GPIO_LED1 0x20080
 #define GPIO_LED2 0x20100
 #define GPIO_LED3 0x20002
 #define BOARDNAME "M3DEBUG"
-#else
+#elif BOARD_LPCP1343
 #define GPIO_LED0 0x30001
 #define GPIO_LED1 0x30002
 #define GPIO_LED2 0x30004
 #define GPIO_LED3 0x30008
 #define BOARDNAME "LPC-P1343"
+#elif BOARD_M3RADIO
+#define GPIO_LED0	((2<<16) | (1<<4))
+#define GPIO_LED1	((2<<16) | (1<<5))
+#define GPIO_LED2	((2<<16) | (1<<9))
+#define GPIO_LED3	((0<<16) | (1<<7))
+#define BOARDNAME "M3RADIO"
+#else
+#error unknown configuration
 #endif
 
 #define RAM_BASE	0x10000000
@@ -221,6 +229,17 @@ int main() {
 	if ((gpr0 == 0x12345678) && (gpr1 == 0xA5A50000))
 		timeout = 0;
 
+	if (timeout) {
+		/* wait up to 1s to enumerate */
+		writel(readl(SYS_CLK_CTRL) | SYS_CLK_CT32B0, SYS_CLK_CTRL);
+		writel(48, TM32B0PR);
+		writel(TM32TCR_ENABLE, TM32B0TCR);
+		while (!usb_online() && (readl(TM32B0TC) < 1000000)) ;
+		writel(readl(SYS_CLK_CTRL) & (~SYS_CLK_CT32B0), SYS_CLK_CTRL);
+		if (!usb_online())
+			goto start_app;
+	}
+
 	x = 0;
 	for (;;) {
 		if (x & 1) {
@@ -247,6 +266,7 @@ int main() {
 		}
 	}
 
+start_app:
 	/* warm reset into the app */
 	writel(0x12345678, GPREG0);
 	writel(0xA5A50001, GPREG1);

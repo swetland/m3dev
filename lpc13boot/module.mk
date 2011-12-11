@@ -1,6 +1,7 @@
 M_NAME := lpc13boot
 M_ARCH := lpc13xx
 M_LINK := build/lpc1343-boot.ld
+M_CFLAGS := -DBOARD_M3DEBUG=1
 M_OBJS := arch/arm-cm3/start.o
 M_OBJS += lpc13boot/main.o
 M_OBJS += lpc13boot/board.o
