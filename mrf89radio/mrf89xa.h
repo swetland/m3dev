@@ -37,8 +37,8 @@
 #define FILCREG		0x10
 #define PFCREG		0x11
 #define SYNCREG		0x12
-#define RSTSREG		0x13
-#define RSVREG		0x14
+#define RSVREG		0x13
+#define RSTSREG		0x14
 #define OOKCREG		0x15
 #define SYNCV31REG	0x16
 #define SYNCV23REG	0x17
