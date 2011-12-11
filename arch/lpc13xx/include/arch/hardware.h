@@ -217,4 +217,11 @@
 #define GPREG3			0x40038010
 #define GPREG4			0x40038014
 
+#define TM32B0TCR		0x40014004
+#define TM32B0TC		0x40014008 /* increments every PR PCLKs */
+#define TM32B0PR		0x4001400C
+#define TM32B0PC		0x40014010 /* increments every PCLK */
+#define TM32TCR_ENABLE		1
+#define TM32TCR_RESET		2
+
 #endif
