@@ -60,5 +60,8 @@ int usb_xmit(void *data, int len);
  */
 int usb_recv_timeout(void *data, int len, unsigned msec);
 
+/* check for host, return nonzero if we found it */
+int usb_online(void);
+
 #endif
 

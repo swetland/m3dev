@@ -137,7 +137,7 @@ static void usb_ep0_send0(void) {
 static u8 ep0state;
 static u8 newaddr;
 
-static volatile int usb_online = 0;
+static volatile int _usb_online = 0;
 
 static void usb_ep0_rx_setup(void) {
 	unsigned c,n;
@@ -177,7 +177,7 @@ static void usb_ep0_rx_setup(void) {
 		return;
 	case SET_CONFIGURATION:
 		write_sie(USB_CC_CONFIG_DEV, (val == 1) ? 1 : 0);
-		usb_online = (val == 1);
+		_usb_online = (val == 1);
 		usb_ep0_send0();
 		ep0state = EP0_TX_ACK;
 		return;
@@ -211,6 +211,11 @@ int usb_recv(void *_data, int count) {
 	return usb_recv_timeout(_data, count, 0);
 }
 
+int usb_online(void) {
+	usb_handle_irq();
+	return _usb_online;
+}
+
 int usb_recv_timeout(void *_data, int count, unsigned timeout) {
 	unsigned n;
 	int sz, rx, xfer;
@@ -221,11 +226,11 @@ int usb_recv_timeout(void *_data, int count, unsigned timeout) {
 	msec_counter = 0;
 
 	/* if offline, wait for us to go online */
-	while (!usb_online)
+	while (!_usb_online)
 		usb_handle_irq();
 
 	while (count > 0) {
-		if (!usb_online)
+		if (!_usb_online)
 			return -ENODEV;
 
 		n = read_sie(USB_CC_SEL_EPT(2));
@@ -269,7 +274,7 @@ int usb_xmit(void *_data, int len) {
 	tx = 0;
 
 	while (len > 0) {
-		if (!usb_online)
+		if (!_usb_online)
 			return -ENODEV;
 
 		n = read_sie(USB_CC_SEL_EPT(3));

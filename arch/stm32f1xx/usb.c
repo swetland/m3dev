@@ -33,7 +33,7 @@ void irq_usb_hp(void) {
 	for (;;) ;
 }
 
-static volatile int usb_online = 0;
+static volatile int _usb_online = 0;
 static void *ep1_rx_data;
 static volatile int ep1_rx_status;
 static volatile int ep1_tx_busy;
@@ -46,7 +46,7 @@ static unsigned ep1txb = USB_SRAM_BASE + 0x01c0; /* 64 bytes */
 #define ADDR2USB(n) (((n) & 0x3FF) >> 1)
 
 void usb_handle_reset(void) {
-	usb_online = 0;
+	_usb_online = 0;
 	ep1_tx_busy = 0;
 	ep1_rx_status = -ENODEV;
 
@@ -232,7 +232,7 @@ void usb_handle_ep0_setup(unsigned n) {
 	case SET_CONFIGURATION:
 		ep0state = EP0_TX_ACK;
 		ep0_send_ack(n);
-		usb_online = 1; /* TODO: check value */
+		_usb_online = 1; /* TODO: check value */
 		return;	
 	}
 
@@ -285,11 +285,11 @@ int usb_recv(void *_data, int count) {
 	unsigned n;
 	u8 *data = _data;
 
-	while (!usb_online)
+	while (!_usb_online)
 		usb_handle_irq();
 
 	while (count > 0) {
-		if (!usb_online)
+		if (!_usb_online)
 			return -ENODEV;
 
 		ep1_rx_data = data;
@@ -329,7 +329,7 @@ int usb_xmit(void *data, int len) {
 		u32 *dst = (void*) ep1txb;
 		int xfer = (len > 64) ? 64 : len;
 
-		if (!usb_online)
+		if (!_usb_online)
 			return -ENODEV;
 
 		while (ep1_tx_busy)
