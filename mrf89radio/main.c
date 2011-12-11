@@ -39,13 +39,17 @@
 void timer_init(void) {
 	writel(readl(SYS_CLK_CTRL) | SYS_CLK_CT32B0, SYS_CLK_CTRL);
 	writel(48, TM32B0PR); 
-	writel(TM32TCR_RESET, TM32B0TCR);
 }
-
-void timer_delay(unsigned usec) {
-	writel(TM32TCR_ENABLE, TM32B0TCR);
-	while (readl(TM32B0TC) < usec) ;
+void timer_reset(void) {
 	writel(TM32TCR_RESET, TM32B0TCR);
+	writel(TM32TCR_ENABLE, TM32B0TCR);
+}
+static inline unsigned timer_read(void) {
+	return readl(TM32B0TC);
+}
+void timer_delay(unsigned usec) {
+	timer_reset();
+	while (timer_read() < usec) ;
 }
 
 void LED(unsigned n) {
@@ -73,8 +77,6 @@ volatile unsigned RX_IDLE_OUT = 0;
 volatile unsigned RX_OVERFLOW = 0;
 volatile unsigned RX_IDLE_RESTART = 0;
 volatile unsigned RX_NON16 = 0;
-
-u8 PACKET[16];
 
 unsigned mrf89wr(unsigned reg, unsigned val) {
 	gpio_clr(GPIO_CSCON);
@@ -185,54 +187,92 @@ static void radio_init(unsigned bps) {
 	mrf89wr(R1CREG, 119);
 	mrf89wr(P1CREG, 95);
 	mrf89wr(S1CREG, 36);
+	mrf89wr(S1CREG, 36);
 }
 
 unsigned vcotune = 0;
 
-static void radio_tx(void) {
-	unsigned n, count;
-	count = 0;
 
-	PACKET[0] = 0xAA;
-	PACKET[1] = 0xBB;
-	PACKET[2] = 0xCC;
-	PACKET[3] = 0xDD;
-	for (n = 4; n < 15; n++)
-		PACKET[n] = 0x55;
-	PACKET[15] = 0xFF;
+unsigned volatile RSSI = 0xfff;
+
+int packet_tx(void *data, unsigned len) {
+	unsigned n;
+	mrf89wr(GCONREG, (vcotune << 1) | GCON_TX |
+		GCON_863_BAND | GCON_RPS_1);
+	mrf89wr(FTPRIREG, FTPRI_SBO | FTPRI_PLL_LOCK_ENABLE |
+		FTPRI_TX_ON_FIFO_NOT_EMPTY);
+	mrf89wr(PLOADREG, len);
+	fifo_wr(data, len);
+	for (;;) {
+		n = mrf89rd(FTPRIREG);
+		if (n & FTPRI_TX_DONE) {
+			mrf89wr(GCONREG, (vcotune << 1) | GCON_STANDBY |
+				GCON_863_BAND | GCON_RPS_1);
+			return 0;
+		}
+	}
+}
+
+int packet_rx(void *data, unsigned len, unsigned timeout) {
+	timer_reset();
+	mrf89wr(PLOADREG, len);
+	mrf89wr(GCONREG, (vcotune << 1) | GCON_RX |
+		GCON_863_BAND | GCON_RPS_1);
+	for (;;) {
+		if (mrf89rd(PKTCREG) & PKTC_CRC_OK) {
+			fifo_rd(data, len);
+			mrf89wr(GCONREG, (vcotune << 1) | GCON_STANDBY |
+				GCON_863_BAND | GCON_RPS_1);
+			return 0;
+		}
+		if (timer_read() > timeout) {
+			return -1;
+		}
+	}
+}
+
+struct pkt {
+	unsigned magic;
+	unsigned serial;
+	unsigned data0;
+	unsigned data1;
+};
+
+struct pkt PX, PR;
+
+static void radio_tx(void) {
+	unsigned count = 0;
 
 	for (;;) {	
-		*((u32*) (PACKET + 4)) = count;
-		LED(count++);
-		mrf89wr(GCONREG, (vcotune << 1) | GCON_TX | GCON_863_BAND | GCON_RPS_1);
-		mrf89wr(FTPRIREG, FTPRI_SBO | FTPRI_PLL_LOCK_ENABLE |
-			FTPRI_TX_ON_FIFO_NOT_EMPTY);
-		mrf89wr(PLOADREG, 16);
-		fifo_wr(PACKET, 16);
+		LED(count);
 
-		for (;;) {
-			n = mrf89rd(FTPRIREG);
-			if (n & FTPRI_TX_DONE) {
-				mrf89wr(GCONREG, (vcotune << 1) | GCON_STANDBY | GCON_863_BAND | GCON_RPS_1);
-				break;
-			}
-		}
+		PX.magic = 0x12345678;
+		PX.serial = count;
+		PX.data0 = 0xAAAAAAAA;
+		PX.data1 = 0x55555555;
+
+		packet_tx(&PX, sizeof(PX));
+
+		if (packet_rx(&PR, sizeof(PR), 25000))
+			continue;
+
+		if (PR.serial != PX.serial)
+			continue;
+
+		count++;
 	}
 }
 
 static void radio_rx(void) {
 	unsigned count = 0;
+
 	for (;;) {	
 		LED(count);
-		mrf89wr(PLOADREG, 16);
-		mrf89wr(GCONREG, (vcotune << 1) | GCON_RX | GCON_863_BAND | GCON_RPS_1);
-
-		while (!(mrf89rd(PKTCREG) & PKTC_CRC_OK)) ;
-
-		fifo_rd(PACKET, 16);
-		mrf89wr(GCONREG, (vcotune << 1) | GCON_RX | GCON_863_BAND | GCON_RPS_1);
+		if (packet_rx(&PR, sizeof(PR), 0xffffffff))
+			continue;
+		packet_tx(&PR, sizeof(PR));
 		count++;
-	}
+	}	
 }
 
 int main() {
@@ -279,7 +319,6 @@ int main() {
 #if CONFIG_TX
 	radio_tx();
 #endif
-
 	for (;;) ;
 }
 
