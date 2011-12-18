@@ -1,11 +1,28 @@
 
+http://infocenter.arm.com/help/topic/com.arm.doc.genc007826/Barrier_Litmus_Tests_and_Cookbook_A08.pdf
+
+-----
+
+http://infocenter.arm.com/help/index.jsp?topic=/com.arm.doc.faqs/ka14041.html
+states:
+
+It is architecturally defined that software must perform a Data Memory 
+Barrier (DMB) operation:
+- between acquiring a resource, for example, through locking a mutex 
+  (MUTual EXclusion) or decrementing a semaphore, and making any access 
+  to that resource
+- before making a resource available, for example, through unlocking a 
+  mutex or incrementing a semaphore.
+
+-----
+
 To generate a scheduling barrier:
    asm volatile ("" : : : "memory");
 
 To generate a hardware memory barrier:
    __sync_synchronize();
 
-   This appears to issue a "dwb sy" on cortex-m3 in arm-eabi-none
+   This appears to issue a "dmb sy" on cortex-m3 in arm-eabi-none
 
 
 Based on these excerpts from a gcc-help thread.  References:
