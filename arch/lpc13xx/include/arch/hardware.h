@@ -217,11 +217,62 @@
 #define GPREG3			0x40038010
 #define GPREG4			0x40038014
 
+
 #define TM32B0TCR		0x40014004
 #define TM32B0TC		0x40014008 /* increments every PR PCLKs */
 #define TM32B0PR		0x4001400C
 #define TM32B0PC		0x40014010 /* increments every PCLK */
+#define TM32B0MCR		0x40014014
+#define TM32B0MR0		0x40014018
+#define TM32B0MR1		0x4001401C
+#define TM32B0MR2		0x40014020
+#define TM32B0MR3		0x40014024
+#define TM32B0CCR		0x40014028
+#define TM32B0CR0		0x4001402C
+#define TM32B0EMR		0x4001403C
+
+#define TM32B1TCR		0x40018004
+#define TM32B1TC		0x40018008 /* increments every PR PCLKs */
+#define TM32B1PR		0x4001800C
+#define TM32B1PC		0x40018010 /* increments every PCLK */
+#define TM32B1MCR		0x40018014
+#define TM32B1MR0		0x40018018
+#define TM32B1MR1		0x4001801C
+#define TM32B1MR2		0x40018020
+#define TM32B1MR3		0x40018024
+#define TM32B1CCR		0x40018028
+#define TM32B1CR0		0x4001802C
+#define TM32B1EMR		0x4001803C
+
 #define TM32TCR_ENABLE		1
 #define TM32TCR_RESET		2
+
+/* Match Control Register (MCR) actions for each Match Register */
+#define TM32_M0_IRQ		(1 << 0)
+#define TM32_M0_RESET		(1 << 1)
+#define TM32_M0_STOP		(1 << 2)
+#define TM32_M1_IRQ		(1 << 3)
+#define TM32_M1_RESET		(1 << 4)
+#define TM32_M1_STOP		(1 << 5)
+#define TM32_M2_IRQ		(1 << 6)
+#define TM32_M2_RESET		(1 << 7)
+#define TM32_M2_STOP		(1 << 8)
+#define TM32_M3_IRQ		(1 << 9)
+#define TM32_M3_RESET		(1 << 10)
+#define TM32_M3_STOP		(1 << 11)
+
+/* External Match Control (EMC) actions for each Match Register */
+#define TM32_EMC0_CLEAR		(1 << 4)
+#define TM32_EMC0_SET		(2 << 4)
+#define TM32_EMC0_TOGGLE	(3 << 4)
+#define TM32_EMC1_CLEAR		(1 << 6)
+#define TM32_EMC1_SET		(2 << 6)
+#define TM32_EMC1_TOGGLE	(3 << 6)
+#define TM32_EMC2_CLEAR		(1 << 8)
+#define TM32_EMC2_SET		(2 << 8)
+#define TM32_EMC2_TOGGLE	(3 << 8)
+#define TM32_EMC3_CLEAR		(1 << 10)
+#define TM32_EMC3_SET		(2 << 10)
+#define TM32_EMC3_TOGGLE	(3 << 10)
 
 #endif
