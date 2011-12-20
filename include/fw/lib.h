@@ -34,6 +34,7 @@ void serial_putc(unsigned c);
 void gpio_config(unsigned n, unsigned cfg);
 void gpio_set(unsigned n);
 void gpio_clr(unsigned n);
+int gpio_get(unsigned n);
 
 /* init USB and attach */
 void usb_init(unsigned vid, unsigned pid);
@@ -62,6 +63,21 @@ int usb_recv_timeout(void *data, int len, unsigned msec);
 
 /* check for host, return nonzero if we found it */
 int usb_online(void);
+
+
+/* low level interrupt-based USB interface */
+
+extern void (*usb_ep1_rx_full_cb)(void);
+extern void (*usb_ep1_tx_empty_cb)(void);
+extern void (*usb_online_cb)(int online);
+
+int usb_ep1_read(void *data, int max);
+int usb_ep1_write(void *data, int len);
+
+void usb_mask_ep1_rx_full(void);
+void usb_unmask_ep1_rx_full(void);
+void usb_mask_ep1_tx_empty(void);
+void usb_unmask_ep1_tx_empty(void);
 
 #endif
 

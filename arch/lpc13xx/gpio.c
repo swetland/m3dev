@@ -40,7 +40,7 @@ void gpio_clr(unsigned n) {
 	writel(0, addr);
 }
 
-unsigned gpio_get(unsigned n) {
+int gpio_get(unsigned n) {
 	unsigned addr = 0x50003FFC | (n & 0x30000);
 	n &= 0xFFF;
 	return (readl(addr) & n) != 0;

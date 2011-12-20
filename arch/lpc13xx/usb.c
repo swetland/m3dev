@@ -20,6 +20,7 @@
 #include <fw/io.h>
 
 #include <arch/hardware.h>
+#include <arch/cpu.h>
 #include <protocol/usb.h>
 
 static volatile unsigned msec_counter = 0;
@@ -76,7 +77,6 @@ static u8 _cfg00[] = {
 	0x02,		/* bulk */
 	0x40, 0x00,	/* max packet size */
 	0x00,		/* interval */
-
 };
 
 static void write_sie_cmd(unsigned cmd) {
@@ -179,6 +179,8 @@ static void usb_ep0_rx_setup(void) {
 		write_sie(USB_CC_CONFIG_DEV, (val == 1) ? 1 : 0);
 		_usb_online = (val == 1);
 		usb_ep0_send0();
+		if (usb_online_cb)
+			usb_online_cb(_usb_online);
 		ep0state = EP0_TX_ACK;
 		return;
 	}
@@ -216,10 +218,44 @@ int usb_online(void) {
 	return _usb_online;
 }
 
-int usb_recv_timeout(void *_data, int count, unsigned timeout) {
+int usb_ep1_read(void *_data, int len) {
 	unsigned n;
-	int sz, rx, xfer;
+	int sz;
 	u32 *data;
+
+	if (len > 64)
+		return -EFAIL;
+	if (!_usb_online)
+		return -ENODEV;
+
+	data = _data;
+
+	n = read_sie(USB_CC_CLR_EPT(2));
+	if (!(n & 1))
+		return -EBUSY;
+	
+	writel(USB_CTRL_RD_EN | USB_CTRL_EP_NUM(1), USB_CTRL);
+	/* to ensure PLEN is valid */
+	asm("nop"); asm("nop"); asm("nop");
+	sz = readl(USB_RX_PLEN) & 0x1FF;
+
+	if (sz > len)
+		sz = len;
+
+	while (len > 0) {
+		*data++ = readl(USB_RX_DATA);
+		len -= 4;
+	}
+
+	writel(0, USB_CTRL);
+	n = read_sie(USB_CC_CLR_BUFFER);
+
+	return sz;
+}
+
+int usb_recv_timeout(void *_data, int count, unsigned timeout) {
+	int r, rx;
+	u8 *data;
 
 	data = _data;
 	rx = 0;
@@ -230,73 +266,73 @@ int usb_recv_timeout(void *_data, int count, unsigned timeout) {
 		usb_handle_irq();
 
 	while (count > 0) {
-		if (!_usb_online)
-			return -ENODEV;
+		r = usb_ep1_read(data, (count > 64) ? 64 : count);
 
-		n = read_sie(USB_CC_SEL_EPT(2));
-		if (!(n & 1)) {
+		if (r >= 0) {
+			rx += r;
+			data += r;
+			count -= r;
+			/* terminate on short packet */
+			if (r != 64)
+				break;
+		} else if (r == -EBUSY) {
 			if (timeout && (msec_counter > timeout))
 				return -ETIMEOUT;
 			usb_handle_irq();
-			continue;
+		} else {
+			return r;
 		}
-	
-		writel(USB_CTRL_RD_EN | USB_CTRL_EP_NUM(1), USB_CTRL);
-		/* to ensure PLEN is valid */
-		asm("nop"); asm("nop"); asm("nop");
-		sz = readl(USB_RX_PLEN) & 0x1FF;
-
-		xfer = (sz > count) ? count : sz;
-
-		rx += xfer;
-		count -= xfer;
-		while (xfer > 0) {
-			*data++ = readl(USB_RX_DATA);
-			xfer -= 4;
-		}
-
-		writel(0, USB_CTRL);
-		n = read_sie(USB_CC_CLR_BUFFER);
-
-		/* terminate on short packet */
-		if (sz != 64)
-			break;
 	}
 	return rx;
 }
 
-int usb_xmit(void *_data, int len) {
+int usb_ep1_write(void *_data, int len) {
 	unsigned n;
-	int tx, xfer;
 	u32 *data;
+
+	if (len > 64)
+		return -EFAIL;
+	if (!_usb_online)
+		return -ENODEV;
+
+	data = _data;
+	n = read_sie(USB_CC_CLR_EPT(3));
+	if (n & 1)
+		return -EBUSY;
+
+	writel(USB_CTRL_WR_EN | USB_CTRL_EP_NUM(1), USB_CTRL);
+	writel(len, USB_TX_PLEN);
+	while (len > 0) {
+		writel(*data++, USB_TX_DATA);
+		len -= 4;
+	}
+	writel(0, USB_CTRL);
+
+	n = read_sie(USB_CC_SEL_EPT(3));
+	n = read_sie(USB_CC_VAL_BUFFER);
+	return 0;
+}
+
+int usb_xmit(void *_data, int len) {
+	int r, tx, xfer;
+	u8 *data;
 
 	data = _data;
 	tx = 0;
 
 	while (len > 0) {
-		if (!_usb_online)
-			return -ENODEV;
-
-		n = read_sie(USB_CC_SEL_EPT(3));
-		if (n & 1) {
-			usb_handle_irq();
-			continue;
-		}
-
 		xfer = (len > 64) ? 64 : len;
-
-		writel(USB_CTRL_WR_EN | USB_CTRL_EP_NUM(1), USB_CTRL);
-		writel(xfer, USB_TX_PLEN);
+		r = usb_ep1_write(data, xfer);
+		if (r < 0) {
+			if (r == -EBUSY) {
+				usb_handle_irq();
+				continue;
+			}
+			return r;
+		}
 		tx += xfer;
 		len -= xfer;
-		while (xfer > 0) {
-			writel(*data++, USB_TX_DATA);
-			xfer -= 4;
-		}
-		writel(0, USB_CTRL);
-
-		n = read_sie(USB_CC_SEL_EPT(3));
-		n = read_sie(USB_CC_VAL_BUFFER);
+		data += xfer;
 	}
 	return tx;
 }
@@ -328,6 +364,8 @@ void usb_init(unsigned vid, unsigned pid) {
 
 	write_sie(USB_CC_SET_ADDR, 0x80); /* ADDR=0, EN=1 */
 	write_sie(USB_CC_SET_DEV_STATUS, 0x01); /* CONNECT */
+
+	writel(USB_INT_EP0 | USB_INT_EP1, USB_INT_ENABLE);
 }
 
 void usb_stop(void) {
@@ -335,9 +373,41 @@ void usb_stop(void) {
 	write_sie(USB_CC_SET_DEV_STATUS, 0);
 }
 
-void usb_handle_irq(void) {
+void usb_mask_ep1_rx_full(void) {
+	disable_interrupts();
+	writel(readl(USB_INT_ENABLE) & (~USB_INT_EP2), USB_INT_ENABLE);
+	enable_interrupts();
+}
+void usb_unmask_ep1_rx_full(void) {
+	disable_interrupts();
+	writel(readl(USB_INT_ENABLE) | USB_INT_EP2, USB_INT_ENABLE);
+	enable_interrupts();
+}
+ 
+void usb_mask_ep1_tx_empty(void) {
+	disable_interrupts();
+	writel(readl(USB_INT_ENABLE) & (~USB_INT_EP3), USB_INT_ENABLE);
+	enable_interrupts();
+}
+void usb_unmask_ep1_tx_empty(void) {
+	disable_interrupts();
+	writel(readl(USB_INT_ENABLE) | USB_INT_EP3, USB_INT_ENABLE);
+	enable_interrupts();
+}
+
+void (*usb_ep1_rx_full_cb)(void);
+void (*usb_ep1_tx_empty_cb)(void);
+void (*usb_online_cb)(int online);
+
+volatile int USB_IRQ_COUNT = 0;
+
+void handle_irq_usb_irq(void) {
 	unsigned n;
+
+	USB_IRQ_COUNT++;
+
 	n = readl(USB_INT_STATUS);
+	//writel(n & (USB_INT_EP0 | USB_INT_EP1), USB_INT_CLEAR);
 	writel(n, USB_INT_CLEAR);
 	if (n & USB_INT_FRAME)
 		msec_counter++;
@@ -345,11 +415,16 @@ void usb_handle_irq(void) {
 		usb_ep0_rx();
 	if (n & USB_INT_EP1)
 		usb_ep0_tx();
-#if 0
-	if (n & USB_INT_EP2)
-		usb_ep1_rx();
-	if (n & USB_INT_EP3)
-		usb_ep1_tx();
-#endif
+
+	/* ignore masked interrupts */
+	n &= readl(USB_INT_ENABLE);
+
+	if ((n & USB_INT_EP2) && usb_ep1_rx_full_cb)
+		usb_ep1_rx_full_cb();
+	if ((n & USB_INT_EP3) && usb_ep1_tx_empty_cb)
+		usb_ep1_tx_empty_cb();
 }
 
+void usb_handle_irq(void) {
+	handle_irq_usb_irq();
+}
