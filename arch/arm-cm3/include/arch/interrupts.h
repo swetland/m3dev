@@ -1,4 +1,4 @@
-/* cm3.h
+/* interrupts.h
  *
  * Copyright 2011 Brian Swetland <swetland@frotz.net>
  * 
@@ -15,10 +15,13 @@
  * limitations under the License.
  */
 
-#ifndef _M3_H_
-#define _M3_H_
+#ifndef _ARCH_INTERRUPTS_H_
+#define _ARCH_INTERRUPTS_H_
+
+#define _IRQ(name) v_##name,
 
 enum {
+#if 0
         v_reset = 1,
         v_nmi,
         v_hardfault,
@@ -34,6 +37,10 @@ enum {
         v_reserved_e,
         v_pendsv,
         v_systick,
+#endif
+#include <arch/irqs.h>
 };
+
+#undef _IRQ
 
 #endif
