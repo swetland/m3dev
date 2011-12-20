@@ -1,4 +1,6 @@
 
+.section .vectors
+
 .syntax unified
 
 .globl _start

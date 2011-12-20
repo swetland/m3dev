@@ -4,6 +4,7 @@
 SECTIONS {
 	.text : {
 		. = ALIGN(4);
+		KEEP (*(.vectors))
 		*(.text)
 		*(.text.*)
 		*(.rodata)

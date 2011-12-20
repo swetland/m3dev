@@ -24,12 +24,17 @@ TARGET_OBJCOPY := $(TOOLCHAIN)objcopy
 TARGET_OBJDUMP := $(TOOLCHAIN)objdump
 
 TARGET_CFLAGS := -g -Os -Wall
+TARGET_CFLAGS += -I. -Iinclude
 TARGET_CFLAGS += -mcpu=cortex-m3 -mthumb -mthumb-interwork
 TARGET_CFLAGS += -ffunction-sections -fdata-sections 
 TARGET_CFLAGS += -fno-builtin -nostdlib
-#TARGET_CFLAGS += -ffreestanding
-TARGET_CFLAGS += -Wl,--gc-sections
-TARGET_CFLAGS += -I. -Iinclude
+
+# tell gcc there's not a full libc it can depend on
+# so it won't do thinks like printf("...") -> puts("...")
+TARGET_CFLAGS += -ffreestanding
+
+TARGET_LFLAGS := --gc-sections
+
 #TARGET_LIBGCC := $(shell $(TARGET_CC) $(TARGET_CFLAGS) -print-libgcc-file-name)
 
 HOST_CFLAGS := -g -O1 -Wall

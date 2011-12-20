@@ -58,7 +58,7 @@ $(OUT)/$(M_NAME): _LIBS := $(M_LIBS)
 $(OUT)/$(M_NAME): _LINK := $(M_LINK)
 $(OUT)/$(M_NAME): $(M_OBJS)
 	@echo link $@
-	$(QUIET)$(TARGET_LD) -Bstatic -T $(_LINK) $(_OBJS) $(_LIBS) -o $@
+	$(QUIET)$(TARGET_LD) $(TARGET_LFLAGS) -Bstatic -T $(_LINK) $(_OBJS) $(_LIBS) -o $@
 
 $(info module $(M_NAME))
 
