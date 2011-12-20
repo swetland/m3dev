@@ -8,4 +8,9 @@ static inline void enable_interrupts(void) {
 	asm("cpsie i" : : : "memory");
 }
 
+void irq_enable(unsigned n);
+void irq_disable(unsigned n);
+
+void irq_set_base(unsigned vector_table_addr);
+
 #endif
