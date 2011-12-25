@@ -38,3 +38,9 @@ M_NAME := lpcboot
 M_OBJS := tools/lpcboot.o
 M_OBJS += tools/usb-linux.o
 include build/host-executable.mk
+
+M_NAME := uconsole 
+M_OBJS := tools/uconsole.o
+M_OBJS += tools/usb-linux.o
+include build/host-executable.mk
+
