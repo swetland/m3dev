@@ -7,6 +7,7 @@ M_OBJS += m3debug/main.o
 M_OBJS += m3debug/swdp.o
 M_OBJS += m3debug/board.o
 M_OBJS += libfw/print.o
+M_OBJS += libfw/serialconsole.o
 M_OBJS += arch/lpc13xx/gpio.o
 M_OBJS += arch/lpc13xx/serial.o
 M_OBJS += arch/lpc13xx/usb.o

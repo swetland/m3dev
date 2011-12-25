@@ -52,10 +52,3 @@ printstr:
 	}
 }
 
-void printx(const char *fmt, ...) {
-	va_list ap;
-	va_start(ap, fmt);
-	vprintx(serial_putc, fmt, ap);
-	va_end(ap);
-}
-
