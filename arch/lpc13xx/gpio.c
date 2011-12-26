@@ -40,6 +40,11 @@ void gpio_clr(unsigned n) {
 	writel(0, addr);
 }
 
+void gpio_wr(unsigned n, unsigned val) {
+	unsigned addr = 0x50000000 | (n & 0x30000) | ((n & 0xFFF) << 2);
+	writel(val ? 0xFFFFFFFF : 0, addr);
+}
+
 int gpio_get(unsigned n) {
 	unsigned addr = 0x50003FFC | (n & 0x30000);
 	n &= 0xFFF;
