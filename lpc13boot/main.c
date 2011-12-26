@@ -21,27 +21,12 @@
 
 #include <arch/hardware.h>
 
-#if BOARD_M3DEBUG
-#define GPIO_LED0 0x00004
-#define GPIO_LED1 0x20080
-#define GPIO_LED2 0x20100
-#define GPIO_LED3 0x20002
-#define BOARDNAME "M3DEBUG"
-#elif BOARD_LPCP1343
-#define GPIO_LED0 0x30001
-#define GPIO_LED1 0x30002
-#define GPIO_LED2 0x30004
-#define GPIO_LED3 0x30008
-#define BOARDNAME "LPC-P1343"
-#elif BOARD_M3RADIO
-#define GPIO_LED0	((2<<16) | (1<<4))
-#define GPIO_LED1	((2<<16) | (1<<5))
-#define GPIO_LED2	((2<<16) | (1<<9))
-#define GPIO_LED3	((0<<16) | (1<<7))
-#define BOARDNAME "M3RADIO"
-#else
-#error unknown configuration
-#endif
+extern u32 gpio_led0;
+extern u32 gpio_led1;
+extern u32 gpio_led2;
+extern u32 gpio_led3;
+
+extern u8 board_name[];
 
 #define RAM_BASE	0x10000000
 #define RAM_SIZE	(7 * 1024)
@@ -73,7 +58,6 @@ struct device_info {
 
 struct device_info DEVICE = {
 	.part = "LPC1343",
-	.board = BOARDNAME,
 	.version = 0x0001000,
 	.ram_base = RAM_BASE,
 	.ram_size = RAM_SIZE,
@@ -119,10 +103,10 @@ void _boot_image(void *img) {
 }
 
 void boot_image(void *img) {
-        gpio_config(GPIO_LED0, 0);
-        gpio_config(GPIO_LED1, 0);
-        gpio_config(GPIO_LED2, 0);
-        gpio_config(GPIO_LED3, 0);
+        gpio_config(gpio_led0, 0);
+        gpio_config(gpio_led1, 0);
+        gpio_config(gpio_led2, 0);
+        gpio_config(gpio_led3, 0);
 
 	usb_stop();
 
@@ -211,10 +195,10 @@ int main() {
 		_boot_image((void*) 0x1000);
 
 	board_init();
-        gpio_config(GPIO_LED0, 1);
-        gpio_config(GPIO_LED1, 1);
-        gpio_config(GPIO_LED2, 1);
-        gpio_config(GPIO_LED3, 1);
+        gpio_config(gpio_led0, 1);
+        gpio_config(gpio_led1, 1);
+        gpio_config(gpio_led2, 1);
+        gpio_config(gpio_led3, 1);
 
 	usb_init(0x18d1,0xdb00);
 
@@ -228,6 +212,8 @@ int main() {
 	/* request to stay in the bootloader forever? */
 	if ((gpr0 == 0x12345678) && (gpr1 == 0xA5A50000))
 		timeout = 0;
+
+	strcpy((char*) DEVICE.board, (char*) board_name);
 
 	if (timeout) {
 		/* wait up to 1s to enumerate */
@@ -243,15 +229,15 @@ int main() {
 	x = 0;
 	for (;;) {
 		if (x & 1) {
-			gpio_set(GPIO_LED0);
-			gpio_set(GPIO_LED1);
-			gpio_set(GPIO_LED2);
-			gpio_set(GPIO_LED3);
+			gpio_set(gpio_led0);
+			gpio_set(gpio_led1);
+			gpio_set(gpio_led2);
+			gpio_set(gpio_led3);
 		} else {
-			gpio_clr(GPIO_LED0);
-			gpio_clr(GPIO_LED1);
-			gpio_clr(GPIO_LED2);
-			gpio_clr(GPIO_LED3);
+			gpio_clr(gpio_led0);
+			gpio_clr(gpio_led1);
+			gpio_clr(gpio_led2);
+			gpio_clr(gpio_led3);
 		}
 		x++;
 		n = usb_recv_timeout(buf, 64, 100);
