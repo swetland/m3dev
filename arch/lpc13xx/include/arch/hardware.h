@@ -275,4 +275,6 @@
 #define TM32_EMC3_SET		(2 << 10)
 #define TM32_EMC3_TOGGLE	(3 << 10)
 
+#define MKGPIO(bank,num)	(((bank) << 16) | (1 << (num)))
+
 #endif
