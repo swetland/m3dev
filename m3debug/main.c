@@ -26,12 +26,11 @@
 
 #define TRACE 0
 
-#define GPIO_LED0 0x00004
-#define GPIO_LED1 0x20080
-#define GPIO_LED2 0x20100
-#define GPIO_LED3 0x20002
-
-#define GPIO_RESET_N 0x20400
+extern u32 gpio_led0;
+extern u32 gpio_led1;
+extern u32 gpio_led2;
+extern u32 gpio_led3;
+extern u32 gpio_reset_n;
 
 unsigned swdp_trace = 0;
 
@@ -152,11 +151,11 @@ void process_txn(u32 txnid, u32 *rx, int rxc, u32 *tx) {
 		case CMD_RESET:
 			if (n == 0) {
 				/* deassert RESET */
-				gpio_config(GPIO_RESET_N, 0);
+				gpio_config(gpio_reset_n, 0);
 			} else {
 				/* assert RESET */
-				gpio_config(GPIO_RESET_N, 1);
-				gpio_clr(GPIO_RESET_N);
+				gpio_config(gpio_reset_n, 1);
+				gpio_clr(gpio_reset_n);
 			}
 			continue;
 		case CMD_DOWNLOAD: {
@@ -179,7 +178,7 @@ void process_txn(u32 txnid, u32 *rx, int rxc, u32 *tx) {
 			func = reboot_bootloader;
 			continue;
 		case CMD_SET_CLOCK:
-			n = set_swdp_clock(n);
+			n = ssp0_set_clock(n);
 			printu("swdp clock is now 0x%x KHz\n", n);
 			continue;
 		default:
@@ -227,11 +226,13 @@ int main() {
 	int rxc;
 
 	board_init();
+	serial_init(48000000, 115200);
+	ssp0_init();
 
-	gpio_config(GPIO_LED0, 1);
-	gpio_config(GPIO_LED1, 1);
-	gpio_config(GPIO_LED2, 1);
-	gpio_config(GPIO_LED3, 1);
+	gpio_config(gpio_led0, 1);
+	gpio_config(gpio_led1, 1);
+	gpio_config(gpio_led2, 1);
+	gpio_config(gpio_led3, 1);
 
 	printx("[ rswdp agent v0.9 ]\n");
 	printx("[ built " __DATE__ " " __TIME__ " ]\n");
@@ -239,9 +240,9 @@ int main() {
 	usb_init(0x18d1, 0xdb03);
 
 	for (;;) {
-		gpio_clr(GPIO_LED0);
+		gpio_clr(gpio_led0);
 		rxc = usb_recv(rxbuffer, sizeof(rxbuffer));
-		gpio_set(GPIO_LED0);
+		gpio_set(gpio_led0);
 
 #if TRACE
 		int n;

@@ -7,6 +7,8 @@ u32 gpio_led1 = MKGPIO(2, 7);
 u32 gpio_led2 = MKGPIO(2, 8);
 u32 gpio_led3 = MKGPIO(2, 1);
 
+u32 gpio_reset_n = MKGPIO(2, 10);
+
 u8 board_name[] = "M3DEBUG";
 
 void board_init(void) {
