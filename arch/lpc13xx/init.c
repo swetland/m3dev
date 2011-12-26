@@ -65,8 +65,8 @@ void ssp0_init(void) {
         /* enable SSP0 clock */
         writel(readl(SYS_CLK_CTRL) | SYS_CLK_SSP0, SYS_CLK_CTRL);
 
-        /* SSP0 PCLK = SYSCLK / 1 (8MHz) */
-        writel(2, SYS_DIV_SSP0);
+        /* SSP0 PCLK = SYSCLK / 3 (16MHz) */
+        writel(3, SYS_DIV_SSP0);
 
         /* deassert reset */
         writel(readl(PRESETCTRL) | SSP0_RST_N, PRESETCTRL);
@@ -84,4 +84,32 @@ void ssp0_init(void) {
         writel(IOCON_FUNC_1 | IOCON_DIGITAL, IOCON_PIO0_9); /* MOSI */
         writel(IOCON_FUNC_1 | IOCON_DIGITAL, IOCON_PIO2_11); /* SCK */
 }
+
+static struct {
+        u16 khz;
+        u16 div;
+} ssp_clocks[] = {
+        { 24000, 1, },
+        { 12000, 2, },
+        {  8000, 3, },
+        {  6000, 4, },
+        {  4000, 6, },
+        {  3000, 8, },
+        {  2000, 12, },
+        {  1000, 24, }, 
+};
+
+unsigned ssp0_set_clock(unsigned khz) {
+        int n;
+        if (khz < 1000)
+                khz = 1000;
+        for (n = 0; n < (sizeof(ssp_clocks)/sizeof(ssp_clocks[0])); n++) {
+                if (ssp_clocks[n].khz <= khz) {
+                        writel(ssp_clocks[n].div, SYS_DIV_SSP0);
+                        return ssp_clocks[n].khz;
+                }
+        }
+        return 0;
+}
+
 

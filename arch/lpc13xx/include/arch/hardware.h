@@ -277,4 +277,10 @@
 
 #define MKGPIO(bank,num)	(((bank) << 16) | (1 << (num)))
 
+void core_48mhz_init(void);
+void ssp0_init(void);
+unsigned ssp0_set_clock(unsigned khz);
+void serial_init(unsigned sysclk_mhz, unsigned baud);
+
+
 #endif
