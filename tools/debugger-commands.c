@@ -35,6 +35,8 @@
 
 #include "debugger.h"
 
+extern struct debugger_command debugger_commands[];
+
 long long now() {
 	struct timeval tv;
 	gettimeofday(&tv, 0);
@@ -500,6 +502,15 @@ int do_setclock(int argc, param *argv) {
 	return swdp_set_clock(argv[0].n);
 }
 
+int do_help(int argc, param *argv) {
+	struct debugger_command *cmd;
+	for (cmd = debugger_commands; cmd->func != NULL; cmd++) {
+		xprintf("%-16s: %s\n", cmd->name, cmd->help);
+	}
+
+	return 0;
+}
+
 struct debugger_command debugger_commands[] = {
 	{ "exit",	"", do_exit,	"" },
 	{ "attach",	"", do_attach,	"attach/reattach to sw-dp" },
@@ -521,6 +532,7 @@ struct debugger_command debugger_commands[] = {
 	{ "bootloader", "", do_bootloader, "reboot into bootloader" },
 	{ "setclock",	"", do_setclock, "set clock rate (khz)" },
 	{ "text",	"", do_text, "dump text" },
+	{ "help",	"", do_help, "help" },
 	{ 0, 0, 0, 0 },
 };
 
