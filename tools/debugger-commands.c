@@ -366,7 +366,7 @@ int do_flash(int argc, param *argv) {
 	int fd, r;
 
 	if (argc != 2) {
-		xprintf("error: usage: download <file> <addr>\n");
+		xprintf("error: usage: flash <file> <addr>\n");
 		return -1;
 	}
 
